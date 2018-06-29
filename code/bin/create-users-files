@@ -129,6 +129,9 @@ users_folder="$(   yq r - users_folder    <<< "${config}")"
 placeholder="$(    yq r - placeholder     <<< "${config}")"
 
 # TODO: yq fails to support accessing substructures, so use jq
+# TODO: this works with yq 1.15.0, but fails with yq 2.x.y;
+# on macOS, use e.g. brew switch yq 1.15.0 to downgrade:
+# https://stackoverflow.com/a/4158763
 users_json="$(     yq -j r - users        <<< "${config}")"
 
 
