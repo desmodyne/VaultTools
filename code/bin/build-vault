@@ -123,40 +123,54 @@ req_tools+='upload-policies upload-secrets upload-users'
 
 
 # -----------------------------------------------------------------------------
-# determine path to other vault scripts
+# determine path to other scripts in this project
 
-# In production, all vault scripts are installed  using a distribution package
-# and any (vault or other, e.g. Linux system) tools are found in PATH;
+# In production, all related scripts are installed using a distribution package
+# and any (related or other, e.g. Linux system) tools are found in PATH;
 # during development, this is not necessarily the case: Test if all tools are
 # found and if one is missing, append the path this script resides in to PATH
 # and retry. This does not mix package / production and development versions,
-# either all vault scripts are taken from PATH or all are taken from local.
+# either all related scripts are taken from PATH or all are taken from local.
+
+# TODO: align output
 
 amended_path=false
+
+echo 'determine path to sub scripts:'
 
 for req_tool in ${req_tools}
 do
     # https://stackoverflow.com/a/677212
     # https://github.com/koalaman/shellcheck/wiki/SC2230
-    if [ -z "$(command -v "${req_tool}")" ]
+    echo -n "  ${req_tool}: "
+    if [ -x "$(command -v "${req_tool}")" ]
     then
-        echo "${req_tool}: No such file or directory; amend PATH and retry"
+        echo 'OK'
+    else
+        echo 'No such file or directory'
         PATH="${path_to_this_script}:${PATH}"
         amended_path=true
+        break
     fi
 done
 
 if [ "${amended_path}" = true ]
 then
+    echo 'amend PATH and retry:'
     for req_tool in ${req_tools}
     do
-        if [ -z "$(command -v "${req_tool}")" ]
+        echo -n "  ${req_tool}: "
+        if [ -x "$(command -v "${req_tool}")" ]
         then
-            echo "${req_tool}: No such file or directory"
-            exit -1
+            echo 'OK'
+        else
+            echo 'No such file or directory'
+            exit 1
         fi
     done
 fi
+
+echo
 
 
 # -----------------------------------------------------------------------------
