@@ -123,7 +123,8 @@ fi
 # http://mikefarah.github.io/yq
 config="$(yq r "${config_file}")"
 
-vault_host="$(      yq r - vault_host       <<< "${config}")"
+# TODO: derive port 443 from protocol https ?
+vault_address="$(   yq r - vault_address    <<< "${config}")"
 path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
 key_file_name="$(   yq r - key_file_name    <<< "${config}")"
 
@@ -166,9 +167,6 @@ fi
 
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
-
-# complete vault url
-vault_address="https://${vault_host}"
 
 # secrets root path
 # TODO: is this the only possibly top-level folder ?
