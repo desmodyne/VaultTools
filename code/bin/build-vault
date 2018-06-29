@@ -23,7 +23,7 @@ req_tools+='upload-policies upload-secrets upload-users'
 
 
 # -----------------------------------------------------------------------------
-# load functions from library
+# load functions from library and run as appropriate
 
 # TODO: review path to library
 source vault.lib
@@ -45,6 +45,22 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: set up global convention if cURL / REST API ./. command line client
 # TODO: globally, use root token only where absolutely required:
 # https://www.vaultproject.io/guides/identity/authentication.html#policy-requirements
+# TODO: for all scripts that log into vault: revoke root token afterwards
+# TODO: refactor functions / sections into library to reduce code duplication
+# TODO: validate configuration settings in set-up-* scripts
+# TODO: set up unit-testing:
+# https://medium.com/@pimterry/testing-your-shell-scripts-with-bats-abfca9bdc5b9
+# TODO: refactor various template approaches to using jq:
+# https://github.com/stedolan/jq/wiki/Cookbook#using-jq-variables-as-template-variables
+# TODO: move enabling userpass auth method from upload-users to configure-vault
+# TODO: streamline adding new users:
+#  + call file generation scripts from build-vault
+#  + overwrite existing files only if some cmd line flag is passed
+#  + generate passwords instead of using placeholder (unless cmd line param)
+#  + get list of users from Ansible playbook configuration
+#  + same for PKI: overwrite existing files only if cmd line flag is passed
+#  + refine git check to support generating all files for one user
+
 
 if ! init-vault            "${config_file}"; then exit 1; fi
 if ! unseal-vault          "${config_file}"; then exit 1; fi
