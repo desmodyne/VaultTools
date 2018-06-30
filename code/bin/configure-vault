@@ -71,6 +71,7 @@ else
     echo 'OK'
 fi
 
+
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 echo -n 'Log into vault: '

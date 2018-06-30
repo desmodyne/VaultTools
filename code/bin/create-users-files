@@ -41,6 +41,7 @@ placeholder="$(    yq r - placeholder     <<< "${config}")"
 users_json="$(     yq -j r - users        <<< "${config}")"
 
 
+# -----------------------------------------------------------------------------
 if ! validate_config_settings;      then exit 1; fi
 
 
@@ -68,6 +69,10 @@ path_to_users_folder="${path_to_sec_loc}/${users_folder}"
 
 
 # -----------------------------------------------------------------------------
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
 # create users configuration file
 
 
@@ -76,9 +81,6 @@ then
     echo "Failed to pushd to project root ${path_to_project_root}"
     exit
 fi
-
-
-if ! validate_secure_location;      then exit 1; fi
 
 
 if [ ! -d "${path_to_users_folder}" ]

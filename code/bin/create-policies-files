@@ -38,6 +38,7 @@ services_json="$(  yq -j r - services     <<< "${config}")"
 users_json="$(     yq -j r - users        <<< "${config}")"
 
 
+# -----------------------------------------------------------------------------
 if ! validate_config_settings;      then exit 1; fi
 
 
@@ -82,6 +83,10 @@ path_to_policies_folder="${path_to_sec_loc}/${policies_folder}"
 
 
 # -----------------------------------------------------------------------------
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
 # create policies configuration file
 
 
@@ -90,9 +95,6 @@ then
     echo "Failed to pushd to project root ${path_to_project_root}"
     exit
 fi
-
-
-if ! validate_secure_location;      then exit 1; fi
 
 
 if [ ! -d "${path_to_policies_folder}" ]
