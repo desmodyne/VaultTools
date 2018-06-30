@@ -9,6 +9,11 @@
 # created : 2018-02-19
 
 
+echo
+echo 'Seal HashiCorp Vault'
+echo
+
+
 # https://www.vaultproject.io/api/system/seal.html
 
 
@@ -101,3 +106,8 @@ else
     echo "${output}"
     exit 1
 fi
+
+
+echo
+echo 'HashiCorp Vault seal complete'
+echo

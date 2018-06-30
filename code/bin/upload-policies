@@ -14,6 +14,11 @@
 # https://www.vaultproject.io/guides/configuration/policies.html
 
 
+echo
+echo 'Upload HashiCorp Vault policies'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -88,7 +93,7 @@ root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 # TODO: this fails, address is ignored
 # if output="$(vault login "${root_token}" -address="${vault_address}" 2>&1)"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -106,20 +111,22 @@ fi
 
 for service_name in ${service_names}
 do
+    echo "service ${service_name}:"
+
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${service_name}.hcl"
 
-    echo "Upload policies for service ${service_name}:"
-
-    echo -n 'Create / update policy: '
+    echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
                        "${service_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
+
+    echo "  file uploaded: ${path_to_conf_file}"
 done
 
 if [ "${users_json}" != 'null' ]
@@ -129,9 +136,9 @@ fi
 
 for username in ${usernames}
 do
-    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${username}.hcl"
+    echo "user ${username}:"
 
-    echo "Upload policies for user ${username}:"
+    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${username}.hcl"
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -185,14 +192,21 @@ do
     #       ... system/policy.html#create-update-policy:
     #   vault write sys/policy/my-policy policy=@my-policy.hcl
 
-    echo -n 'Create / update policy: '
+    echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
                        "${username}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
+
+    echo "  file uploaded: ${path_to_conf_file}"
 done
+
+
+echo
+echo 'HashiCorp Vault policy upload complete'
+echo

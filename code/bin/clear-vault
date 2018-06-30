@@ -9,6 +9,11 @@
 # created : 2018-02-23
 
 
+echo
+echo 'Clear HashiCorp Vault'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -75,7 +80,7 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -236,3 +241,8 @@ do
         exit 1
     fi
 done
+
+
+echo
+echo 'HashiCorp Vault clear complete'
+echo

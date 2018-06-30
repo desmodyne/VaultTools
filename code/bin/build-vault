@@ -68,6 +68,7 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: review [ == ] string comparison: https://stackoverflow.com/a/2237103
 # TODO: remove plural from create-users-files, create-policies-files (?)
 # TODO: review quoting string with and without variables
+# TODO: run clear-vault and seal-vault as part of this ?
 
 
 if ! init-vault            "${config_file}"; then exit 1; fi
@@ -82,5 +83,6 @@ if ! upload-secrets        "${config_file}"; then exit 1; fi
 if ! set-up-auth-approles  "${config_file}"; then exit 1; fi
 
 
+echo
 echo 'HashiCorp Vault instance build complete'
 echo

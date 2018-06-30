@@ -14,6 +14,11 @@
 # https://www.vaultproject.io/guides/identity/authentication.html#steps  <-- !!!
 
 
+echo
+echo 'Enable HashiCorp Vault approle authentication'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -75,7 +80,7 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -89,7 +94,7 @@ fi
 
 # TODO: see also enabling userpass auth method in upload-users
 
-echo -n 'Get enabled auth methods: '
+echo -n 'get enabled auth methods: '
 if output="$(vault auth list -address="${vault_address}" 2>&1)"
 then
     echo 'OK'
@@ -117,7 +122,7 @@ IFS="${OLD_IFS}"
 
 auth_methods="${auth_methods%% }"
 
-echo -n 'Enable approle auth method: '
+echo -n 'enable approle auth method: '
 
 if [[ "${auth_methods}" == *approle* ]]
 then
@@ -141,7 +146,9 @@ fi
 
 for service_name in ${service_names}
 do
-    echo -n "Create ${service_name} approle: "
+    echo "service ${service_name}: "
+
+    echo -n "  enable approle auth: "
 
     # TODO: test if user exists and output 'overwriting' message
     if output="$(curl --data "{\"policies\": \"${service_name}\"}"  \
@@ -169,7 +176,12 @@ do
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
+
+
+echo
+echo 'HashiCorp Vault policy approle authentication enable complete'
+echo

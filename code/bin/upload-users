@@ -12,6 +12,11 @@
 # https://www.vaultproject.io/api/auth/userpass/index.html
 
 
+echo
+echo 'Upload HashiCorp Vault users'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -75,7 +80,7 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -114,7 +119,7 @@ fi
 # token/       token       token based credentials
 # userpass/    userpass    n/a
 
-echo -n 'Get enabled auth methods: '
+echo -n 'get enabled auth methods: '
 if output="$(vault auth list -address="${vault_address}" 2>&1)"
 then
     echo 'OK'
@@ -140,7 +145,7 @@ IFS="${OLD_IFS}"
 
 auth_methods="${auth_methods%% }"
 
-echo -n 'Enable userpass auth method: '
+echo -n 'enable userpass auth method: '
 
 if [[ "${auth_methods}" == *userpass* ]]
 then
@@ -164,15 +169,15 @@ fi
 
 for username in ${usernames}
 do
-    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${username}.json"
+    echo "user ${username}:"
 
-    echo -n "Upload user ${username}: "
+    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${username}.json"
 
     # TODO: error handling, e.g. file does not exist
     password="$(jq -r '.password' "${path_to_conf_file}")"
     if [ "${password}" = "${placeholder}" ]
     then
-        echo 'user password has not been set'
+        echo '  user password has not been set; not uploaded'
         continue
     fi
 
@@ -213,3 +218,8 @@ do
         exit 1
     fi
 done
+
+
+echo
+echo 'HashiCorp Vault user upload complete'
+echo
