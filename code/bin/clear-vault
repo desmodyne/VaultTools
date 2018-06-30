@@ -41,6 +41,7 @@ path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
 key_file_name="$(   yq r - key_file_name    <<< "${config}")"
 
 
+# -----------------------------------------------------------------------------
 if ! validate_config_settings;      then exit 1; fi
 
 

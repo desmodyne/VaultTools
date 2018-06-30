@@ -12,7 +12,7 @@
 # TODO: review #!/usr/bin/env bash
 # TODO: do not use global variables, but function parameters
 # TODO: document parameters and return values
-# TODO: set variables in here and use them elsewhere ?
+# TODO: really set variables in here and use them elsewhere ?
 # TODO: review function names, most of them do more than the name suggests
 # TODO: use named parameters ? https://stackoverflow.com/a/30033822
 # TODO: add code location indicator to log messages ?

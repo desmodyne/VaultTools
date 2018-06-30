@@ -49,6 +49,10 @@ services_json="$(   yq -j r - services      <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------
+if ! validate_config_settings;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
 # configure script parameters
 
 # full path to file with key and token info

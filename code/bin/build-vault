@@ -51,7 +51,6 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: globally, use root token only where absolutely required:
 # https://www.vaultproject.io/guides/identity/authentication.html#policy-requirements
 # TODO: for all scripts that log into vault: revoke root token afterwards
-# TODO: validate configuration settings in set-up-* scripts
 # TODO: set up unit-testing:
 # https://medium.com/@pimterry/testing-your-shell-scripts-with-bats-abfca9bdc5b9
 # TODO: refactor various template approaches to using jq:
@@ -63,10 +62,9 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 #  + get list of users from Ansible playbook configuration
 #  + same for PKI: overwrite existing files only if cmd line flag is passed
 #  + refine git check to support generating all files for one user
-# TODO: review [ == ] string comparison: https://stackoverflow.com/a/2237103
-# TODO: remove plural from create-users-files, create-policies-files (?)
-# TODO: review quoting string with and without variables
 # TODO: run clear-vault and seal-vault as part of this ?
+# TODO: get SSH keys from vault instead of generating them out of tool
+# TODO: fix shellcheck messages
 
 
 if ! init-vault            "${config_file}"; then exit 1; fi
