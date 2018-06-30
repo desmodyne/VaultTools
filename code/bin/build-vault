@@ -9,6 +9,11 @@
 # created : 2018-02-23
 
 
+echo
+echo 'Build HashiCorp Vault instance'
+echo
+
+
 # -----------------------------------------------------------------------------
 # configure script parameters
 
@@ -61,6 +66,8 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 #  + same for PKI: overwrite existing files only if cmd line flag is passed
 #  + refine git check to support generating all files for one user
 # TODO: review [ == ] string comparison: https://stackoverflow.com/a/2237103
+# TODO: remove plural from create-users-files, create-policies-files (?)
+# TODO: review quoting string with and without variables
 
 
 if ! init-vault            "${config_file}"; then exit 1; fi
@@ -73,3 +80,7 @@ if ! upload-users          "${config_file}"; then exit 1; fi
 if ! upload-policies       "${config_file}"; then exit 1; fi
 if ! upload-secrets        "${config_file}"; then exit 1; fi
 if ! set-up-auth-approles  "${config_file}"; then exit 1; fi
+
+
+echo 'HashiCorp Vault instance build complete'
+echo

@@ -15,6 +15,7 @@
 # TODO: set variables in here and use them elsewhere ?
 # TODO: review function names, most of them do more than the name suggests
 # TODO: use named parameters ? https://stackoverflow.com/a/30033822
+# TODO: add code location indicator to log messages ?
 
 
 # define functions: http://stackoverflow.com/a/6212408
@@ -32,14 +33,13 @@
 
 function determine_path_to_sub_scripts
 {
-    # TODO: align output
+    echo 'determine path to sub scripts:'
 
     amended_path=false
 
-    echo 'determine path to sub scripts:'
-
     for req_tool in ${req_tools}
     do
+        # TODO: align output (here and below)
         # https://stackoverflow.com/a/677212
         # https://github.com/koalaman/shellcheck/wiki/SC2230
         echo -n "  ${req_tool}: "
@@ -76,20 +76,25 @@ function determine_path_to_sub_scripts
 # -----------------------------------------------------------------------------
 function determine_platform
 {
+    echo -n 'determine platform: '
+
     # http://stackoverflow.com/a/18434831
 
     # TODO: strictly speaking, setting variables in here is a side effect
 
     case "${OSTYPE}" in
         darwin*)
+            echo 'OK'
             sed='gsed'
             xargs='gxargs'
             ;;
         linux-*)
+            echo 'OK'
             sed='sed'
             xargs='xargs'
             ;;
         *)
+            echo 'ERROR'
             echo "Unsupported operating system: ${OSTYPE}"
             return 1
             ;;
@@ -99,7 +104,7 @@ function determine_platform
 # -----------------------------------------------------------------------------
 function get_vault_status
 {
-    echo -n 'Get vault status: '
+    echo -n 'get vault status: '
 
     # NOTE: from vault status --help:
     #   The exit code reflects the seal status:
@@ -107,7 +112,7 @@ function get_vault_status
     #       - 1 - error
     #       - 2 - sealed
     #
-    # exit codes of this function:
+    # return codes of this function:
     #       - 0 - unsealed
     #       - 1 - error
     #       - 2 - sealed
@@ -133,6 +138,7 @@ function get_vault_status
 
         1)  # output contains control characters
             # https://unix.stackexchange.com/a/96485
+            # TODO: refactor control characters removal out to function
             last_line="$(tail -n 1 <<< "${output}" \
                 | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
 
@@ -141,7 +147,7 @@ function get_vault_status
                 echo 'OK'
                 return 3
             else
-                echo 'ERROR:'
+                echo 'ERROR'
                 # TODO: output contains control characters
                 echo "${output}"
                 return 1
@@ -152,7 +158,7 @@ function get_vault_status
             return 2
             ;;
 
-        *)  echo 'ERROR:'
+        *)  echo 'ERROR'
             echo "Unexpected vault status exit code ${res}"
             if [ -n "${output}" ]; then echo "${output}"; fi
             return 1
@@ -165,6 +171,8 @@ function get_vault_status
 # -----------------------------------------------------------------------------
 function proc_cmd_line_args
 {
+    echo -n 'process command line arguments: '
+
     # NOTE: for some reason, if no parameters are passed,
     # "$#" is 0, but "$0" still returns the name of the script being run
 
@@ -176,6 +184,9 @@ function proc_cmd_line_args
     # is called with no parameters
     if [ $# -ne 1 ]
     then
+        echo 'ERROR'
+        echo "Wrong number of arguments: $#"
+        echo
         usage
         return 1
     fi
@@ -187,12 +198,15 @@ function proc_cmd_line_args
 
         case "${key}" in
           # NOTE: must escape -?, seems to act as wildcard otherwise
-          -\?|--help) usage; return 1 ;;
+          -\?|--help) echo 'HELP'; echo; usage; return 1 ;;
 
           *)  if [ -z "${config_file}" ]
               then
                   config_file="$1"
               else
+                  echo 'ERROR'
+                  echo 'Wrong number of arguments'
+                  echo
                   usage
                   return 1
               fi
@@ -207,6 +221,9 @@ function proc_cmd_line_args
     # config file is a mandatory command line argument
     if [ -z "${config_file}" ]
     then
+        echo 'ERROR'
+        echo 'Wrong number of arguments'
+        echo
         usage
         return 1
     fi
@@ -214,15 +231,19 @@ function proc_cmd_line_args
     # http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
     if [ ! -e "${config_file}" ]
     then
+        echo 'ERROR'
         echo "${config_file}: No such file or directory"
         return 1
     fi
 
     if [ ! -r "${config_file}" ]
     then
+        echo 'ERROR'
         echo "${config_file}: File is not readable"
         return 1
     fi
+
+    echo 'OK'
 }
 
 # -----------------------------------------------------------------------------
@@ -249,7 +270,7 @@ EOT
 # -----------------------------------------------------------------------------
 function validate_config_settings
 {
-    echo -n 'Validate configuration settings: '
+    echo -n 'validate configuration settings: '
 
     # TODO: verify path_to_sec_loc is an absolute path ?
     # TODO: resolve symbolic links into real path ?
@@ -259,12 +280,11 @@ function validate_config_settings
         if [ -d "${path_to_sec_loc}" ]
         then
             echo 'OK'
-            echo
         else
             echo 'ERROR'
-            echo '  Path exists, but is not a directory:'
-            echo "  ${path_to_sec_loc}"
-            exit 1
+            echo 'Path exists, but is not a directory:'
+            echo "${path_to_sec_loc}"
+            return 1
         fi
     else
         # split paths into its components
@@ -290,12 +310,11 @@ function validate_config_settings
         if [ -d "/${array[0]}/${array[1]}" ]
         then
             echo 'OK'
-            echo
         else
             echo 'ERROR'
-            echo '  Path to secure location is not mounted:'
-            echo "  ${path_to_sec_loc}"
-            exit 1
+            echo 'Path to secure location is not mounted:'
+            echo "${path_to_sec_loc}"
+            return 1
         fi
     fi
 }
@@ -310,7 +329,7 @@ function validate_config_settings
 # -----------------------------------------------------------------------------
 function validate_secure_location
 {
-    echo -n 'Verify secure location is under version control: '
+    echo -n 'verify secure location is under version control: '
 
     if output="$(git -C "${path_to_sec_loc}" rev-parse --git-dir)"
     then
@@ -318,11 +337,11 @@ function validate_secure_location
     else
         echo 'ERROR'
         echo "${output}"
-        exit 1
+        return 1
     fi
 
     # if the repo is not clean to prevent overwriting changes
-    echo -n 'Verify secure location repository status: '
+    echo -n 'verify secure location repository status: '
 
     # https://unix.stackexchange.com/a/155077
     if output="$(git -C "${path_to_sec_loc}" status --porcelain)"
@@ -335,11 +354,11 @@ function validate_secure_location
             echo 'ERROR'
             echo 'Repository has uncommitted changes:'
             echo "${output}"
-            exit 1
+            return 1
         fi
     else
         echo 'ERROR'
         echo "${output}"
-        exit 1
+        return 1
     fi
 }

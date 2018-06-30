@@ -9,6 +9,11 @@
 # created : 2018-02-21
 
 
+echo
+echo 'Create HashiCorp Vault policy files'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -99,7 +104,7 @@ fi
 
 if [ ! -d "${path_to_policies_folder}" ]
 then
-    echo -n 'Create policies configuration folder: '
+    echo -n 'create policies configuration folder: '
     if output="$(mkdir -p "${path_to_policies_folder}" 2>&1)"
     then
         echo 'OK'
@@ -119,10 +124,11 @@ fi
 
 for service_name in ${service_names}
 do
-    path_to_conf_file="${path_to_policies_folder}/${service_name}.hcl"
-    echo "${path_to_conf_file}"
+    echo "service ${service_name}:"
 
-    echo -n "Render template data template: "
+    path_to_conf_file="${path_to_policies_folder}/${service_name}.hcl"
+
+    echo -n '  render template data template: '
     # j2 --format env requires export
     export service_name="${service_name}"
     if output="$(j2 --format env \
@@ -132,12 +138,12 @@ do
         policy_tmpl_data="${output}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
     export service_name=
 
-    echo -n "Create policies configuration file: "
+    echo -n '  create policies configuration file: '
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -152,10 +158,11 @@ do
         echo "${output}" > "${path_to_conf_file}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
-    echo
+
+    echo "  file created: ${path_to_conf_file}"
 done
 
 
@@ -166,10 +173,11 @@ fi
 
 for username in ${usernames}
 do
-    path_to_conf_file="${path_to_policies_folder}/${username}.hcl"
-    echo "${path_to_conf_file}"
+    echo "user ${username}:"
 
-    echo -n "Render template data template: "
+    path_to_conf_file="${path_to_policies_folder}/${username}.hcl"
+
+    echo -n '  render template data template: '
     # j2 --format env requires export
     export username="${username}"
     if output="$(j2 --format env \
@@ -179,12 +187,12 @@ do
         policy_tmpl_data="${output}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
     export username=
 
-    echo -n "Create policies configuration file: "
+    echo -n '  create policies configuration file: '
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -199,10 +207,11 @@ do
         echo "${output}" > "${path_to_conf_file}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
-    echo
+
+    echo "  file created: ${path_to_conf_file}"
 done
 
 
@@ -211,3 +220,8 @@ then
     echo "Failed to popd from project root ${path_to_project_root}"
     exit
 fi
+
+
+echo
+echo 'HashiCorp Vault policy file creation complete'
+echo

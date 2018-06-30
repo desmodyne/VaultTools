@@ -12,6 +12,11 @@
 # https://www.vaultproject.io/docs/audit/file.html
 
 
+echo
+echo 'Configure HashiCorp Vault instance'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -71,7 +76,7 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -86,7 +91,7 @@ fi
 # flag provided but not defined: -format
 # vault audit list -detailed -format json
 
-echo -n 'Get audit devices: '
+echo -n 'get audit devices: '
 if output="$(vault audit list -address="${vault_address}" -detailed 2>&1)"
 then
     echo 'OK'
@@ -96,7 +101,7 @@ else
     exit 1
 fi
 
-echo -n 'Set up vault log file: '
+echo -n 'set up vault log file: '
 
 # sample output:
 # Path     Type    Description    Replication    Options
@@ -126,6 +131,9 @@ do
     then
         # TODO: support re-setting to new log file path ?
         echo 'already set up'
+        echo
+        echo 'HashiCorp Vault instance configuration complete'
+        echo
         exit 0
     fi
 done
@@ -141,3 +149,8 @@ else
     echo "${output}"
     exit 1
 fi
+
+
+echo
+echo 'HashiCorp Vault instance configuration complete'
+echo

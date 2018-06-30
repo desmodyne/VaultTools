@@ -99,6 +99,8 @@ else
     exit 1
 fi
 
+# TODO: does this scale for
+# arbitrary numbers of auth methods ?
 auth_lines="$(tail -n +3 <<< "${output}")"
 auth_methods=''
 

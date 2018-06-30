@@ -17,6 +17,11 @@
 # and - as per convention - is stored as init.json in a secure location
 
 
+echo
+echo 'Unseal HashiCorp Vault instance'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -66,6 +71,9 @@ esac
 
 if [ "${res}" != 2 ]
 then
+    echo
+    echo 'HashiCorp Vault instance unseal complete'
+    echo
     exit
 fi
 
@@ -141,3 +149,8 @@ else
     echo 'Failed to unsealed vault'
     exit 1
 fi
+
+
+echo
+echo 'HashiCorp Vault instance unseal complete'
+echo

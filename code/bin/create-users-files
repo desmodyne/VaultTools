@@ -9,6 +9,11 @@
 # created : 2018-02-20
 
 
+echo
+echo 'Create HashiCorp Vault user files'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -85,7 +90,7 @@ fi
 
 if [ ! -d "${path_to_users_folder}" ]
 then
-    echo -n 'Create users configuration folder: '
+    echo -n 'create users configuration folder: '
     if output="$(mkdir -p "${path_to_users_folder}" 2>&1)"
     then
         echo 'OK'
@@ -105,6 +110,8 @@ fi
 
 for username in ${usernames}
 do
+    echo "user ${username}:"
+
     policies="$(jq -r ".[] | select(.name == \"${username}\").policies[]" \
                   <<< "${users_json}" | xargs | sed -e 's| |,|g')"
 
@@ -117,10 +124,6 @@ do
     path_to_conf_file="${path_to_users_folder}/${username}.json"
     path_to_temp_file="${path_to_users_folder}/${username}.json.temp"
 
-    # TODO: align output with convention, in this and in all other scripts
-
-    echo "${path_to_conf_file}"
-
     # attempt to get password from existing file
     if [ -f "${path_to_conf_file}" ]
     then
@@ -130,7 +133,7 @@ do
         fi
     fi
 
-    echo -n "Create users configuration file: "
+    echo -n '  create user configuration file: '
 
     # j2 --format env requires export
     # if an existing password was found, use it; otherwise, use placeholder
@@ -145,19 +148,20 @@ do
         echo "${output}" > "${path_to_temp_file}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
     export password=
     export policies=
-    echo
 
     # move temp file to conf file
     if ! output="$(mv "${path_to_temp_file}" "${path_to_conf_file}" 2>&1)"
     then
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
+
+    echo "  file created: ${path_to_conf_file}"
 done
 
 
@@ -166,3 +170,8 @@ then
     echo "Failed to popd from project root ${path_to_project_root}"
     exit
 fi
+
+
+echo
+echo 'HashiCorp Vault user file creation complete'
+echo

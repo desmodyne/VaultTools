@@ -12,6 +12,11 @@
 # https://www.vaultproject.io/api/system/init.html
 
 
+echo
+echo 'Initialize HashiCorp Vault instance'
+echo
+
+
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
@@ -68,18 +73,21 @@ if ! validate_secure_location;      then exit 1; fi
 get_vault_status
 res=$?
 case "${res}" in
-    0)  echo "Vault at ${vault_address} is already initialized - and unsealed"
+    0)  echo "vault at ${vault_address} is already initialized - and unsealed"
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "Vault at ${vault_address} is already initialized - and sealed"
+    2)  echo "vault at ${vault_address} is already initialized - and sealed"
         ;;
-    3)  echo "Vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 
 if [ "${res}" != 3 ]
 then
+    echo
+    echo 'HashiCorp Vault instance initialization complete'
+    echo
     # TODO: review exit code
     exit
 fi
@@ -149,3 +157,8 @@ else
     echo "${output}"
     exit 1
 fi
+
+
+echo
+echo 'HashiCorp Vault instance initialization complete'
+echo
