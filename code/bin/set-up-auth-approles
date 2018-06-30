@@ -2,7 +2,7 @@
 
 # set-up-auth-approles
 #
-# set up AppRole auth method
+# set up AppRole authentication method
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -15,7 +15,7 @@
 
 
 echo
-echo 'Enable HashiCorp Vault approle authentication'
+echo 'Set up HashiCorp Vault AppRole authentication'
 echo
 
 
@@ -76,7 +76,7 @@ fi
 
 
 # -----------------------------------------------------------------------------
-# upload users
+# set up approle authentication
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
@@ -92,7 +92,7 @@ fi
 
 # https://www.vaultproject.io/api/system/auth.html
 
-# TODO: see also enabling userpass auth method in upload-users
+# NOTE: see also set-up-auth-userpass
 
 echo -n 'get enabled auth methods: '
 if output="$(vault auth list -address="${vault_address}" 2>&1)"
@@ -104,8 +104,6 @@ else
     exit 1
 fi
 
-# TODO: does this scale for
-# arbitrary numbers of auth methods ?
 auth_lines="$(tail -n +3 <<< "${output}")"
 auth_methods=''
 
@@ -148,7 +146,7 @@ for service_name in ${service_names}
 do
     echo "service ${service_name}: "
 
-    echo -n "  enable approle auth: "
+    echo -n "  add approle role: "
 
     # TODO: test if user exists and output 'overwriting' message
     if output="$(curl --data "{\"policies\": \"${service_name}\"}"  \
@@ -183,5 +181,5 @@ done
 
 
 echo
-echo 'HashiCorp Vault policy approle authentication enable complete'
+echo 'HashiCorp Vault AppRole authentication setup complete'
 echo

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# upload-users
+# set-up-auth-userpass
 #
-# create users on the vault server
+# set up UserPass authentication method
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
@@ -13,7 +13,7 @@
 
 
 echo
-echo 'Upload HashiCorp Vault users'
+echo 'Set up HashiCorp Vault UserPass authentication'
 echo
 
 
@@ -49,6 +49,10 @@ users_json="$(      yq -j r - users         <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------
+if ! validate_config_settings;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
 # configure script parameters
 
 # full path to file with key and token info
@@ -76,7 +80,7 @@ fi
 
 
 # -----------------------------------------------------------------------------
-# upload users
+# set up userpass authentication
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
@@ -92,7 +96,6 @@ fi
 
 # https://www.vaultproject.io/api/system/auth.html
 
-# TODO: set up userpass auth method in the same way as approle
 # TODO: the http api call does not return a response,
 # but a godawful mess of data, most of it duplicate:
 # https://stackoverflow.com/q/48904371
@@ -129,6 +132,8 @@ else
     exit 1
 fi
 
+# TODO: does this scale for
+# arbitrary numbers of auth methods ?
 auth_lines="$(tail -n +3 <<< "${output}")"
 auth_methods=''
 
@@ -195,6 +200,8 @@ do
     # Warning: om/users/test.json", this makes an empty POST.
     # {"errors":["missing password"]}
 
+    echo -n "  upload user configuration: "
+
     # TODO: test if user exists and output 'overwriting' message
     if output="$(curl --data  @"${path_to_conf_file}"         \
                       --header "X-Vault-Token: ${root_token}" \
@@ -221,12 +228,12 @@ do
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
 
 
 echo
-echo 'HashiCorp Vault user upload complete'
+echo 'HashiCorp Vault UserPass authentication setup complete'
 echo
