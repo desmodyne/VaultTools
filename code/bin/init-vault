@@ -53,6 +53,7 @@ then
     if [ -d "${path_to_sec_loc}" ]
     then
         echo 'OK'
+        echo
     else
         echo 'ERROR'
         echo '  Path exists, but is not a directory:'
@@ -71,6 +72,11 @@ else
     # shellcheck disable=SC2206
     array=(${comps})
 
+    # NOTE: alternate / shorter approach:
+    # https://github.com/koalaman/shellcheck/wiki/SC2207
+    # mapfile -t array < \
+    #     <("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")
+
     # if at least the first two path components exist,
     # they are considered a solid base for the rest
     # TODO: this is specific to local secure location
@@ -78,6 +84,7 @@ else
     if [ -d "/${array[0]}/${array[1]}" ]
     then
         echo 'OK'
+        echo
     else
         echo 'ERROR'
         echo '  Path to secure location is not mounted:'
