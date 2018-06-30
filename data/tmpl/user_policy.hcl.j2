@@ -1,0 +1,27 @@
+# <username>.hcl, rendered from user_policy.hcl.j2
+#
+# HashiCorp Vault policy for one regular user
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-21
+
+
+# under their own path, every user can do anything
+path "secret/user/{{ username }}/*"
+{
+    capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+# in their own root path, every user can read and list
+path "secret/user/{{ username }}"
+{
+    capabilities = ["read", "list"]
+}
+
+# every user can read service secrets
+# (which requires they know the path)
+path "secret/service/*"
+{
+    capabilities = ["read"]
+}

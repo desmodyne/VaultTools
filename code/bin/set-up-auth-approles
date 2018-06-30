@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+
+# set-up-auth-approles
+#
+# set up AppRole auth method
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-06-17
+
+
+# https://www.vaultproject.io/api/auth/approle/index.html#role_name
+# https://www.vaultproject.io/docs/auth/approle.html
+# https://www.vaultproject.io/guides/identity/authentication.html#steps  <-- !!!
+
+# NOTE: see also init-vault for more information
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    darwin*)
+        sed='gsed'
+        ;;
+    linux-*)
+        sed='sed'
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit -1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# define functions
+
+# http://stackoverflow.com/a/6212408
+
+function usage
+{
+
+    # TODO: do not use global variables
+    # TODO: space between << and 'EOT' makes a
+    # difference for atom syntax highlighting
+    # TODO: align properly and remove leading space when printing ?
+
+    read -r -d '' msg_tmpl <<'EOT'
+Usage: %s <config file>
+
+mandatory arguments:
+  config file           absolute path to configuration file
+
+optional arguments:
+  -?, --help            print this help message
+EOT
+
+    # shellcheck disable=SC2059
+    printf "${msg_tmpl}\\n" "${script_name}"
+}
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+# name of this script: http://stackoverflow.com/q/192319
+script_name="$(basename "$0")"
+
+if [ $# -ne 1 ]
+then
+    usage
+    exit 1
+fi
+
+# http://stackoverflow.com/a/14203146
+while [ $# -gt 0 ]
+do
+    key="$1"
+
+    case "${key}" in
+      # NOTE: must escape -?, seems to act as wildcard otherwise
+      -\?|--help) usage; exit 1 ;;
+
+      *)  if [ -z "${config_file}" ]
+          then
+              config_file="$1"
+          else
+              usage
+              exit 1
+          fi
+    esac
+
+    # move past argument or value
+    shift
+done
+
+# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
+
+# config file is a mandatory command line argument
+if [ -z "${config_file}" ]
+then
+    usage
+    exit 1
+fi
+
+# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
+if [ ! -e "${config_file}" ]
+then
+    echo "${config_file}: No such file or directory"
+    exit 1
+fi
+
+if [ ! -r "${config_file}" ]
+then
+    echo "${config_file}: File is not readable"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# NOTE: see config file for parameter documentation
+# TODO: error handling, e.g. check if key_file is available
+# TODO: review output, message only if error or -v / --verbose
+
+# http://mikefarah.github.io/yq
+config="$(yq r "${config_file}")"
+
+vault_host="$(      yq r - vault_host       <<< "${config}")"
+path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
+key_file_name="$(   yq r - key_file_name    <<< "${config}")"
+
+# TODO: yq fails to support accessing substructures, so use jq
+services_json="$(   yq -j r - services      <<< "${config}")"
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+# complete vault url
+vault_address="https://${vault_host}"
+
+
+# -----------------------------------------------------------------------------
+# upload users
+
+echo -n 'Get vault status: '
+
+# NOTE: from vault status --help:
+#   The exit code reflects the seal status:
+#       - 0 - unsealed
+#       - 1 - error
+#       - 2 - sealed
+
+output="$(vault status -address="${vault_address}" 2>&1)"
+res=$?
+if   [ "${res}" = 0 ]
+then
+    echo 'OK'
+elif [ "${res}" = 1 ]
+then
+    echo 'ERROR'
+    echo "${output}"
+    exit "${res}"
+else
+    echo 'OK'
+    echo "Vault at ${vault_address} is sealed; please unseal and try again"
+    exit "${res}"
+fi
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+echo -n 'Log into vault: '
+if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# https://www.vaultproject.io/api/system/auth.html
+
+# TODO: see also enabling userpass auth method in upload-users
+
+echo -n 'Get enabled auth methods: '
+if output="$(vault auth list -address="${vault_address}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+auth_lines="$(tail -n +3 <<< "${output}")"
+auth_methods=''
+
+OLD_IFS="${IFS}" && IFS=$'\n'
+
+for auth_line in ${auth_lines}
+do
+    # TODO: align code, do this with array
+    auth_meth="$("${sed}" -e 's|.*  \([a-z]\+\)  .*|\1|g' <<< "${auth_line}")"
+    auth_methods+="${auth_meth} "
+done
+
+IFS="${OLD_IFS}"
+
+auth_methods="${auth_methods%% }"
+
+echo -n 'Enable approle auth method: '
+
+if [[ "${auth_methods}" == *approle* ]]
+then
+    echo 'already enabled'
+else
+    if output="$(vault auth enable -address="${vault_address}" approle 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+
+if [ "${services_json}" != 'null' ]
+then
+    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+fi
+
+for service_name in ${service_names}
+do
+    echo -n "Create ${service_name} approle: "
+
+    # TODO: test if user exists and output 'overwriting' message
+    if output="$(curl --data "{\"policies\": \"${service_name}\"}"  \
+                      --header "X-Vault-Token: ${root_token}"       \
+                      --request POST                                \
+                      --show-error                                  \
+                      --silent                                      \
+                  "${vault_address}/v1/auth/approle/role/${service_name}" 2>&1)"
+    then
+        # if successful, curl returns 0 and output is empty
+        if [ -z "${output}" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            # sample output:
+            # {"errors":["1 error occurred:\n\n* permission denied"]}
+            if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
+            then
+                echo "${errors}"
+            else
+                echo "${output}"
+            fi
+            exit 1
+        fi
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+done
