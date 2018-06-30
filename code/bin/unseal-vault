@@ -51,31 +51,27 @@ path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
 
 # -----------------------------------------------------------------------------
-# unseal vault
-
-echo -n 'Get vault status: '
-
-# NOTE: from vault status --help:
-#   The exit code reflects the seal status:
-#       - 0 - unsealed
-#       - 1 - error
-#       - 2 - sealed
-
-output="$(vault status -address="${vault_address}" 2>&1)"
+get_vault_status
 res=$?
-if   [ "${res}" = 0 ]
+case "${res}" in
+    0)  echo "Vault at ${vault_address} is already unsealed"
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  #
+        ;;
+    3)  echo "Vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 2 ]
 then
-    echo 'OK'
-    echo "Vault at ${vault_address} is already unsealed"
-    exit "${res}"
-elif [ "${res}" = 1 ]
-then
-    echo 'ERROR'
-    echo "${output}"
-    exit "${res}"
-else
-    echo 'OK'
+    exit
 fi
+
+
+# -----------------------------------------------------------------------------
+# unseal vault
 
 echo 'Unseal vault:'
 

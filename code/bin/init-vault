@@ -65,6 +65,27 @@ if ! validate_secure_location;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  echo "Vault at ${vault_address} is already initialized - and unsealed"
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "Vault at ${vault_address} is already initialized - and sealed"
+        ;;
+    3)  echo "Vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 3 ]
+then
+    # TODO: review exit code
+    exit
+fi
+
+
+# -----------------------------------------------------------------------------
 # init vault
 
 if [ ! -d "${path_to_sec_loc}" ]
@@ -78,51 +99,6 @@ then
         echo "${output}"
         exit 1
     fi
-fi
-
-echo -n 'Get vault status: '
-
-# NOTE: from vault status --help:
-#   The exit code reflects the seal status:
-#       - 0 - unsealed
-#       - 1 - error
-#       - 2 - sealed
-
-# sample output for uninitialized vault:
-#   alexa:~ ssc$ vault status
-#   Error checking seal status: Error making API request.
-#
-#   URL: GET https://vault.desmodyne.com/v1/sys/seal-status
-#   Code: 400. Errors:
-#
-#   * server is not yet initialized
-
-output="$(vault status -address="${vault_address}" 2>&1)"
-res=$?
-if   [ "${res}" = 0 ]
-then
-    echo 'OK'
-    echo "Vault at ${vault_address} is already initialized - and unsealed"
-    exit "${res}"
-elif [ "${res}" = 1 ]
-then
-    # output contains control characters
-    # https://unix.stackexchange.com/a/96485
-    last_line="$(tail -n 1 <<< "${output}" \
-                 | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
-
-    if [ "${last_line}" == '* server is not yet initialized' ]
-    then
-        echo 'OK'
-    else
-        echo 'Unexpected response from server:'
-        echo "${output}"
-        exit "${res}"
-    fi
-else
-    echo 'OK'
-    echo "Vault at ${vault_address} is already initialized - and sealed"
-    exit "${res}"
 fi
 
 

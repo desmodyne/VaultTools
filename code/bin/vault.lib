@@ -97,6 +97,72 @@ function determine_platform
 }
 
 # -----------------------------------------------------------------------------
+function get_vault_status
+{
+    echo -n 'Get vault status: '
+
+    # NOTE: from vault status --help:
+    #   The exit code reflects the seal status:
+    #       - 0 - unsealed
+    #       - 1 - error
+    #       - 2 - sealed
+    #
+    # exit codes of this function:
+    #       - 0 - unsealed
+    #       - 1 - error
+    #       - 2 - sealed
+    #       - 3 - not initialized
+
+    # sample output for uninitialized vault:
+    #   alexa:~ ssc$ vault status
+    #   Error checking seal status: Error making API request.
+    #
+    #   URL: GET https://vault.desmodyne.com/v1/sys/seal-status
+    #   Code: 400. Errors:
+    #
+    #   * server is not yet initialized
+
+    output="$(vault status -address="${vault_address}" 2>&1)"
+    res=$?
+
+    case "${res}" in
+
+        0)  echo 'OK'
+            return 0
+            ;;
+
+        1)  # output contains control characters
+            # https://unix.stackexchange.com/a/96485
+            last_line="$(tail -n 1 <<< "${output}" \
+                | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
+
+            if [ "${last_line}" = '* server is not yet initialized' ]
+            then
+                echo 'OK'
+                return 3
+            else
+                echo 'ERROR:'
+                # TODO: output contains control characters
+                echo "${output}"
+                return 1
+            fi
+            ;;
+
+        2)  echo 'OK'
+            return 2
+            ;;
+
+        *)  echo 'ERROR:'
+            echo "Unexpected vault status exit code ${res}"
+            if [ -n "${output}" ]; then echo "${output}"; fi
+            return 1
+            ;;
+
+    esac
+}
+
+
+# -----------------------------------------------------------------------------
 function proc_cmd_line_args
 {
     # NOTE: for some reason, if no parameters are passed,
