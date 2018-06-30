@@ -41,58 +41,7 @@ placeholder="$(    yq r - placeholder     <<< "${config}")"
 users_json="$(     yq -j r - users        <<< "${config}")"
 
 
-# -----------------------------------------------------------------------------
-# validate config settings
-
-echo -n 'Validate configuration settings: '
-
-# TODO: verify path_to_sec_loc is an absolute path ?
-# TODO: resolve symbolic links into real path ?
-
-if [ -e "${path_to_sec_loc}" ]
-then
-    if [ -d "${path_to_sec_loc}" ]
-    then
-        echo 'OK'
-        echo
-    else
-        echo 'ERROR'
-        echo '  Path exists, but is not a directory:'
-        echo "  ${path_to_sec_loc}"
-        exit 1
-    fi
-else
-    # split paths into its components
-    # https://askubuntu.com/a/600252
-    # TODO: this fails with whitespace in path
-    comps="$("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")"
-
-    # turn path components into array
-    # https://stackoverflow.com/a/13402368
-    # NOTE: word splitting is intended here
-    # shellcheck disable=SC2206
-    array=(${comps})
-
-    # NOTE: alternate / shorter approach:
-    # https://github.com/koalaman/shellcheck/wiki/SC2207
-    # mapfile -t array < \
-    #     <("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")
-
-    # if at least the first two path components exist,
-    # they are considered a solid base for the rest
-    # TODO: this is specific to local secure location
-    # TODO: this assumes at least two comps in path
-    if [ -d "/${array[0]}/${array[1]}" ]
-    then
-        echo 'OK'
-        echo
-    else
-        echo 'ERROR'
-        echo '  Path to secure location is not mounted:'
-        echo "  ${path_to_sec_loc}"
-        exit 1
-    fi
-fi
+if ! validate_config_settings;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
