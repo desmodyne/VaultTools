@@ -51,7 +51,6 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: globally, use root token only where absolutely required:
 # https://www.vaultproject.io/guides/identity/authentication.html#policy-requirements
 # TODO: for all scripts that log into vault: revoke root token afterwards
-# TODO: refactor functions / sections into library to reduce code duplication
 # TODO: validate configuration settings in set-up-* scripts
 # TODO: set up unit-testing:
 # https://medium.com/@pimterry/testing-your-shell-scripts-with-bats-abfca9bdc5b9

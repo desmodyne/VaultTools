@@ -73,9 +73,9 @@ case "${res}" in
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "Vault at ${vault_address} is sealed; please unseal and try again"
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
         ;;
-    3)  echo "Vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 
@@ -115,6 +115,13 @@ do
 
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${service_name}.hcl"
 
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '  policy configuration file does not exist; not uploaded:'
+        echo "  ${path_to_conf_file}"
+        continue
+    fi
+
     echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
                        "${service_name}" "${path_to_conf_file}" 2>&1)"
@@ -139,6 +146,13 @@ do
     echo "user ${username}:"
 
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${username}.hcl"
+
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '  policy configuration file does not exist; not uploaded:'
+        echo "  ${path_to_conf_file}"
+        continue
+    fi
 
     # TODO: req'd for defunct curl call
     # render request data template

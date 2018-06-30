@@ -98,7 +98,7 @@ fi
 
 if [ ! -d "${path_to_sec_loc}" ]
 then
-    echo -n 'Create folder at secure location: '
+    echo -n 'create folder at secure location: '
     if output="$(mkdir -p "${path_to_sec_loc}" 2>&1)"
     then
         echo 'OK'
@@ -115,7 +115,7 @@ fi
 json_data="$(printf "${json_data_tmpl}" "${secret_shares}" \
                                         "${secret_threshold}")"
 
-echo -n 'Init vault: '
+echo -n 'initialize vault: '
 if output="$(curl --data "${json_data}" \
                   --request PUT         \
                   --show-error          \
@@ -137,8 +137,6 @@ then
             echo "${errors}"
         else
             echo "${output}" > "${path_to_key_file}"
-            echo 'Vault has been initialized'
-            exit 0
         fi
     else
         echo 'ERROR'

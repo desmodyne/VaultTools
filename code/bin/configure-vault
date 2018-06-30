@@ -61,7 +61,7 @@ case "${res}" in
         ;;
     2)  #
         ;;
-    3)  echo "Vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 

@@ -63,9 +63,9 @@ case "${res}" in
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "Vault at ${vault_address} is sealed; please unseal and try again"
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
         ;;
-    3)  echo "Vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 
@@ -90,9 +90,9 @@ else
     exit 1
 fi
 
-echo 'Clear vault: '
+echo 'clear vault: '
 
-echo -n '  Get vault policies: '
+echo -n '  get vault policies: '
 # TODO: vault inconsistency: just policy names, no table json etc. as below
 if output="$(vault policy list -address="${vault_address}" 2>&1)"
 then
@@ -100,7 +100,7 @@ then
     response="${output}"
 else
     echo 'ERROR'
-    echo "${output}"
+    echo "  ${output}"
     exit 1
 fi
 
@@ -119,18 +119,18 @@ do
         continue
     fi
 
-    echo -n "  Delete vault policy ${policy}: "
+    echo -n "  delete vault policy ${policy}: "
     if output="$(vault policy delete -address="${vault_address}" "${policy}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
 
-echo -n '  Get vault secrets paths: '
+echo -n '  get vault secrets paths: '
 # NOTE: as opposed to elsewhere, -format=json works here
 if output="$(vault list -address="${vault_address}" \
                  -format=json "${root_path}" 2>&1)"
@@ -138,14 +138,14 @@ then
     echo 'OK'
     response="${output}"
 
-    echo -n '  Extract secrets paths from response: '
+    echo -n '  extract secrets paths from response: '
     if output="$(jq -r '.[]' <<< "${response}" 2>&1)"
     then
         echo 'OK'
         secrets="${output}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 fi
@@ -155,14 +155,14 @@ do
     # TODO: response always is this, no idea if anything was deleted:
     # Success! Data deleted (if it existed) at: secret/user
     # https://github.com/hashicorp/vault/issues/885
-    echo -n "  Delete secrets path ${root_path}/${secret}: "
+    echo -n "  delete secrets path ${root_path}/${secret}: "
     if output="$(vault delete -address="${vault_address}" \
                      "${root_path}/${secret}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
@@ -173,7 +173,7 @@ done
 # supposed to be the same as listing secrets:
 # https://github.com/hashicorp/vault/issues/635
 
-echo -n '  Get users: '
+echo -n '  get users: '
 if output="$(curl --header "X-Vault-Token: ${root_token}" \
                   --request LIST                          \
                   --show-error                            \
@@ -212,7 +212,7 @@ fi
 
 for user in ${users}
 do
-    echo -n "  Delete user ${user}: "
+    echo -n "  delete user ${user}: "
     if output="$(curl --header "X-Vault-Token: ${root_token}" \
                       --request DELETE                        \
                       --show-error                            \
@@ -237,7 +237,7 @@ do
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done

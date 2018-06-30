@@ -97,7 +97,7 @@ if ! validate_secure_location;      then exit 1; fi
 
 if ! pushd "${path_to_project_root}" > /dev/null
 then
-    echo "Failed to pushd to project root ${path_to_project_root}"
+    echo "failed to pushd to project root ${path_to_project_root}"
     exit
 fi
 
@@ -217,7 +217,7 @@ done
 
 if ! popd > /dev/null
 then
-    echo "Failed to popd from project root ${path_to_project_root}"
+    echo "failed to popd from project root ${path_to_project_root}"
     exit
 fi
 

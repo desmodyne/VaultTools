@@ -95,7 +95,7 @@ function determine_platform
             ;;
         *)
             echo 'ERROR'
-            echo "Unsupported operating system: ${OSTYPE}"
+            echo "unsupported operating system: ${OSTYPE}"
             return 1
             ;;
     esac
@@ -159,7 +159,7 @@ function get_vault_status
             ;;
 
         *)  echo 'ERROR'
-            echo "Unexpected vault status exit code ${res}"
+            echo "unexpected vault status exit code ${res}"
             if [ -n "${output}" ]; then echo "${output}"; fi
             return 1
             ;;
@@ -185,7 +185,7 @@ function proc_cmd_line_args
     if [ $# -ne 1 ]
     then
         echo 'ERROR'
-        echo "Wrong number of arguments: $#"
+        echo "wrong number of arguments: $#"
         echo
         usage
         return 1
@@ -205,7 +205,7 @@ function proc_cmd_line_args
                   config_file="$1"
               else
                   echo 'ERROR'
-                  echo 'Wrong number of arguments'
+                  echo 'wrong number of arguments'
                   echo
                   usage
                   return 1
@@ -217,12 +217,13 @@ function proc_cmd_line_args
     done
 
     # TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
+    # TODO: use absolute path to config file in output ?
 
     # config file is a mandatory command line argument
     if [ -z "${config_file}" ]
     then
         echo 'ERROR'
-        echo 'Wrong number of arguments'
+        echo 'wrong number of arguments'
         echo
         usage
         return 1
@@ -282,7 +283,7 @@ function validate_config_settings
             echo 'OK'
         else
             echo 'ERROR'
-            echo 'Path exists, but is not a directory:'
+            echo 'path exists, but is not a directory:'
             echo "${path_to_sec_loc}"
             return 1
         fi
@@ -312,7 +313,7 @@ function validate_config_settings
             echo 'OK'
         else
             echo 'ERROR'
-            echo 'Path to secure location is not mounted:'
+            echo 'path to secure location is not mounted:'
             echo "${path_to_sec_loc}"
             return 1
         fi
@@ -329,9 +330,27 @@ function validate_config_settings
 # -----------------------------------------------------------------------------
 function validate_secure_location
 {
+    echo -n 'verify secure location is a valid folder: '
+
+    if [ ! -d "${path_to_sec_loc}" ]
+    then
+        echo 'ERROR'
+        echo "${path_to_sec_loc}: No such directory"
+        return 1
+    fi
+
+    if [ ! -r "${path_to_sec_loc}" ]
+    then
+        echo 'ERROR'
+        echo "${path_to_sec_loc}: Folder is not readable"
+        return 1
+    fi
+
+    echo 'OK'
+
     echo -n 'verify secure location is under version control: '
 
-    if output="$(git -C "${path_to_sec_loc}" rev-parse --git-dir)"
+    if output="$(git -C "${path_to_sec_loc}" rev-parse --git-dir 2>&1)"
     then
         echo 'OK'
     else
@@ -344,7 +363,7 @@ function validate_secure_location
     echo -n 'verify secure location repository status: '
 
     # https://unix.stackexchange.com/a/155077
-    if output="$(git -C "${path_to_sec_loc}" status --porcelain)"
+    if output="$(git -C "${path_to_sec_loc}" status --porcelain 2>&1)"
     then
 
         if [ -z "${output}" ]
@@ -352,7 +371,7 @@ function validate_secure_location
             echo 'OK'
         else
             echo 'ERROR'
-            echo 'Repository has uncommitted changes:'
+            echo 'repository has uncommitted changes:'
             echo "${output}"
             return 1
         fi

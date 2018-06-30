@@ -63,9 +63,9 @@ case "${res}" in
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "Vault at ${vault_address} is sealed; please unseal and try again"
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
         ;;
-    3)  echo "Vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 
