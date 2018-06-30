@@ -92,9 +92,14 @@ then
 fi
 
 
-# see also init-vault for some more information
+# it is a critical aspect of the overall PKI concept that the secure location
+# SSH keys and generation log files are saved to is under version control;
+# verify and abort script with a warning to the user if this is not the case
+# NOTE: secure location is not necessarily location at repo root; checking for
+# "${path_to_sec_loc}/.git does not help: https://stackoverflow.com/a/2180367
 
 echo -n 'Verify secure location is under version control: '
+
 if output="$(git -C "${path_to_sec_loc}" rev-parse --git-dir)"
 then
     echo 'OK'
@@ -106,6 +111,8 @@ fi
 
 # if the repo is not clean to prevent overwriting changes
 echo -n 'Verify secure location repository status: '
+
+# https://unix.stackexchange.com/a/155077
 if output="$(git -C "${path_to_sec_loc}" status --porcelain)"
 then
 
@@ -123,6 +130,7 @@ else
     echo "${output}"
     exit 1
 fi
+
 
 if [ ! -d "${path_to_policies_folder}" ]
 then
