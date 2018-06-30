@@ -9,104 +9,9 @@
 # created : 2018-02-23
 
 
-# -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
-
-case "${OSTYPE}" in
-    darwin*)
-        ;;
-    linux-*)
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit -1
-        ;;
-esac
-
-
-# -----------------------------------------------------------------------------
-# define functions
-
-# http://stackoverflow.com/a/6212408
-
-function usage
-{
-
-    # TODO: do not use global variables
-    # TODO: space between << and 'EOT' makes a
-    # difference for atom syntax highlighting
-    # TODO: align properly and remove leading space when printing ?
-
-    read -r -d '' msg_tmpl <<'EOT'
-Usage: %s <config file>
-
-mandatory arguments:
-  config file           absolute path to configuration file
-
-optional arguments:
-  -?, --help            print this help message
-EOT
-
-    # shellcheck disable=SC2059
-    printf "${msg_tmpl}\\n" "${script_name}"
-}
-
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
-if [ $# -ne 1 ]
-then
-    usage
-    exit 1
-fi
-
-# http://stackoverflow.com/a/14203146
-while [ $# -gt 0 ]
-do
-    key="$1"
-
-    case "${key}" in
-      # NOTE: must escape -?, seems to act as wildcard otherwise
-      -\?|--help) usage; exit 1 ;;
-
-      *)  if [ -z "${config_file}" ]
-          then
-              config_file="$1"
-          else
-              usage
-              exit 1
-          fi
-    esac
-
-    # move past argument or value
-    shift
-done
-
-# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
-
-# config file is a mandatory command line argument
-if [ -z "${config_file}" ]
-then
-    usage
-    exit 1
-fi
-
-# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
-if [ ! -e "${config_file}" ]
-then
-    echo "${config_file}: No such file or directory"
-    exit 1
-fi
-
-if [ ! -r "${config_file}" ]
-then
-    echo "${config_file}: File is not readable"
-    exit 1
-fi
+echo
+echo 'Build HashiCorp Vault instance'
+echo
 
 
 # -----------------------------------------------------------------------------
@@ -118,45 +23,22 @@ path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # alphabetical list of tools called by this script
 req_tools='configure-vault init-vault unseal-vault '
 req_tools+='create-policies-files create-secrets-files create-users-files '
-req_tools+='set-up-auth-approles '
-req_tools+='upload-policies upload-secrets upload-users'
+req_tools+='set-up-auth-approles set-up-auth-userpass '
+req_tools+='upload-policies upload-secrets'
 
 
 # -----------------------------------------------------------------------------
-# determine path to other vault scripts
+# load functions from library and run as appropriate
 
-# In production, all vault scripts are installed  using a distribution package
-# and any (vault or other, e.g. Linux system) tools are found in PATH;
-# during development, this is not necessarily the case: Test if all tools are
-# found and if one is missing, append the path this script resides in to PATH
-# and retry. This does not mix package / production and development versions,
-# either all vault scripts are taken from PATH or all are taken from local.
+# TODO: review path to library
+source vault.lib
 
-amended_path=false
-
-for req_tool in ${req_tools}
-do
-    # https://stackoverflow.com/a/677212
-    # https://github.com/koalaman/shellcheck/wiki/SC2230
-    if [ -z "$(command -v "${req_tool}")" ]
-    then
-        echo "${req_tool}: No such file or directory; amend PATH and retry"
-        PATH="${path_to_this_script}:${PATH}"
-        amended_path=true
-    fi
-done
-
-if [ "${amended_path}" = true ]
-then
-    for req_tool in ${req_tools}
-    do
-        if [ -z "$(command -v "${req_tool}")" ]
-        then
-            echo "${req_tool}: No such file or directory"
-            exit -1
-        fi
-    done
-fi
+if ! determine_platform;            then exit 1; fi
+# pass all arguments to this script
+# on to sub script unchanged:
+# https://stackoverflow.com/a/3816747
+if ! proc_cmd_line_args "$@";       then exit 1; fi
+if ! determine_path_to_sub_scripts; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -168,6 +50,22 @@ fi
 # TODO: set up global convention if cURL / REST API ./. command line client
 # TODO: globally, use root token only where absolutely required:
 # https://www.vaultproject.io/guides/identity/authentication.html#policy-requirements
+# TODO: for all scripts that log into vault: revoke root token afterwards
+# TODO: set up unit-testing:
+# https://medium.com/@pimterry/testing-your-shell-scripts-with-bats-abfca9bdc5b9
+# TODO: refactor various template approaches to using jq:
+# https://github.com/stedolan/jq/wiki/Cookbook#using-jq-variables-as-template-variables
+# TODO: streamline adding new users:
+#  + call file generation scripts from build-vault
+#  + overwrite existing files only if some cmd line flag is passed
+#  + generate passwords instead of using placeholder (unless cmd line param)
+#  + get list of users from Ansible playbook configuration
+#  + same for PKI: overwrite existing files only if cmd line flag is passed
+#  + refine git check to support generating all files for one user
+# TODO: run clear-vault and seal-vault as part of this ?
+# TODO: get SSH keys from vault instead of generating them out of tool
+# TODO: fix shellcheck messages
+
 
 if ! init-vault            "${config_file}"; then exit 1; fi
 if ! unseal-vault          "${config_file}"; then exit 1; fi
@@ -175,7 +73,12 @@ if ! configure-vault       "${config_file}"; then exit 1; fi
 if ! create-users-files    "${config_file}"; then exit 1; fi
 if ! create-policies-files "${config_file}"; then exit 1; fi
 if ! create-secrets-files  "${config_file}"; then exit 1; fi
-if ! upload-users          "${config_file}"; then exit 1; fi
 if ! upload-policies       "${config_file}"; then exit 1; fi
 if ! upload-secrets        "${config_file}"; then exit 1; fi
 if ! set-up-auth-approles  "${config_file}"; then exit 1; fi
+if ! set-up-auth-userpass  "${config_file}"; then exit 1; fi
+
+
+echo
+echo 'HashiCorp Vault instance build complete'
+echo

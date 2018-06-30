@@ -9,108 +9,20 @@
 # created : 2018-02-23
 
 
-# -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
-
-case "${OSTYPE}" in
-    darwin*)
-        sed='gsed'
-        xargs='gxargs'
-        ;;
-    linux-*)
-        sed='sed'
-        xargs='xargs'
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit -1
-        ;;
-esac
+echo
+echo 'Clear HashiCorp Vault'
+echo
 
 
 # -----------------------------------------------------------------------------
-# define functions
+# load functions from library and run as appropriate
 
-# http://stackoverflow.com/a/6212408
+# see also build-vault
 
-function usage
-{
+source vault.lib
 
-    # TODO: do not use global variables
-    # TODO: space between << and 'EOT' makes a
-    # difference for atom syntax highlighting
-    # TODO: align properly and remove leading space when printing ?
-
-    read -r -d '' msg_tmpl <<'EOT'
-Usage: %s <config file>
-
-mandatory arguments:
-  config file           absolute path to configuration file
-
-optional arguments:
-  -?, --help            print this help message
-EOT
-
-    # shellcheck disable=SC2059
-    printf "${msg_tmpl}\\n" "${script_name}"
-}
-
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
-if [ $# -ne 1 ]
-then
-    usage
-    exit 1
-fi
-
-# http://stackoverflow.com/a/14203146
-while [ $# -gt 0 ]
-do
-    key="$1"
-
-    case "${key}" in
-      # NOTE: must escape -?, seems to act as wildcard otherwise
-      -\?|--help) usage; exit 1 ;;
-
-      *)  if [ -z "${config_file}" ]
-          then
-              config_file="$1"
-          else
-              usage
-              exit 1
-          fi
-    esac
-
-    # move past argument or value
-    shift
-done
-
-# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
-
-# config file is a mandatory command line argument
-if [ -z "${config_file}" ]
-then
-    usage
-    exit 1
-fi
-
-# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
-if [ ! -e "${config_file}" ]
-then
-    echo "${config_file}: No such file or directory"
-    exit 1
-fi
-
-if [ ! -r "${config_file}" ]
-then
-    echo "${config_file}: File is not readable"
-    exit 1
-fi
+if ! determine_platform;            then exit 1; fi
+if ! proc_cmd_line_args "$@";       then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -123,42 +35,14 @@ fi
 # http://mikefarah.github.io/yq
 config="$(yq r "${config_file}")"
 
-vault_host="$(      yq r - vault_host       <<< "${config}")"
+# TODO: derive port 443 from protocol https ?
+vault_address="$(   yq r - vault_address    <<< "${config}")"
 path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
 key_file_name="$(   yq r - key_file_name    <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------
-# validate config settings
-
-echo -n 'Validate configuration settings: '
-
-if [ -e "${path_to_sec_loc}" ]
-then
-    if [ -d "${path_to_sec_loc}" ]
-    then
-        echo 'OK'
-    else
-        echo 'ERROR'
-        echo '  Path exists, but is not a directory:'
-        echo "  ${path_to_sec_loc}"
-        exit 1
-    fi
-else
-    # https://github.com/koalaman/shellcheck/wiki/SC2207
-    mapfile -t array < \
-        <("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")
-
-    if [ -d "/${array[0]}/${array[1]}" ]
-    then
-        echo 'OK'
-    else
-        echo 'ERROR'
-        echo '  Path to secure location is not mounted:'
-        echo "  ${path_to_sec_loc}"
-        exit 1
-    fi
-fi
+if ! validate_config_settings;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -167,36 +51,37 @@ fi
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
-# complete vault url
-vault_address="https://${vault_host}"
-
 # secrets root path
 # TODO: is this the only possibly top-level folder ?
 root_path='secret'
 
 
 # -----------------------------------------------------------------------------
-# clear vault
-
-echo -n 'Get vault status: '
-output="$(vault status -address="${vault_address}" 2>&1)"
+get_vault_status
 res=$?
-if   [ "${res}" = 0 ]
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
 then
-    echo 'OK'
-elif [ "${res}" = 1 ]
-then
-    echo 'ERROR'
-    echo "${output}"
-    exit "${res}"
-else
-    echo "Vault at ${vault_address} is sealed; please unseal and try again"
-    exit "${res}"
+    exit
 fi
+
+
+# -----------------------------------------------------------------------------
+# clear vault
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -206,9 +91,9 @@ else
     exit 1
 fi
 
-echo 'Clear vault: '
+echo 'clear vault: '
 
-echo -n '  Get vault policies: '
+echo -n '  get vault policies: '
 # TODO: vault inconsistency: just policy names, no table json etc. as below
 if output="$(vault policy list -address="${vault_address}" 2>&1)"
 then
@@ -216,7 +101,7 @@ then
     response="${output}"
 else
     echo 'ERROR'
-    echo "${output}"
+    echo "  ${output}"
     exit 1
 fi
 
@@ -235,18 +120,18 @@ do
         continue
     fi
 
-    echo -n "  Delete vault policy ${policy}: "
+    echo -n "  delete vault policy ${policy}: "
     if output="$(vault policy delete -address="${vault_address}" "${policy}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
 
-echo -n '  Get vault secrets paths: '
+echo -n '  get vault secrets paths: '
 # NOTE: as opposed to elsewhere, -format=json works here
 if output="$(vault list -address="${vault_address}" \
                  -format=json "${root_path}" 2>&1)"
@@ -254,14 +139,14 @@ then
     echo 'OK'
     response="${output}"
 
-    echo -n '  Extract secrets paths from response: '
+    echo -n '  extract secrets paths from response: '
     if output="$(jq -r '.[]' <<< "${response}" 2>&1)"
     then
         echo 'OK'
         secrets="${output}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 fi
@@ -271,14 +156,14 @@ do
     # TODO: response always is this, no idea if anything was deleted:
     # Success! Data deleted (if it existed) at: secret/user
     # https://github.com/hashicorp/vault/issues/885
-    echo -n "  Delete secrets path ${root_path}/${secret}: "
+    echo -n "  delete secrets path ${root_path}/${secret}: "
     if output="$(vault delete -address="${vault_address}" \
                      "${root_path}/${secret}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
@@ -289,7 +174,7 @@ done
 # supposed to be the same as listing secrets:
 # https://github.com/hashicorp/vault/issues/635
 
-echo -n '  Get users: '
+echo -n '  get users: '
 if output="$(curl --header "X-Vault-Token: ${root_token}" \
                   --request LIST                          \
                   --show-error                            \
@@ -328,7 +213,7 @@ fi
 
 for user in ${users}
 do
-    echo -n "  Delete user ${user}: "
+    echo -n "  delete user ${user}: "
     if output="$(curl --header "X-Vault-Token: ${root_token}" \
                       --request DELETE                        \
                       --show-error                            \
@@ -353,7 +238,12 @@ do
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 done
+
+
+echo
+echo 'HashiCorp Vault clear complete'
+echo

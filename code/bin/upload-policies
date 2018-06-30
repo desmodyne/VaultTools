@@ -13,107 +13,21 @@
 # https://www.vaultproject.io/docs/concepts/policies.html
 # https://www.vaultproject.io/guides/configuration/policies.html
 
-# NOTE: see also init-vault for more information
+
+echo
+echo 'Upload HashiCorp Vault policies'
+echo
 
 
 # -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
+# load functions from library and run as appropriate
 
-case "${OSTYPE}" in
-    darwin*)
-        ;;
-    linux-*)
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit -1
-        ;;
-esac
+# see also build-vault
 
+source vault.lib
 
-# -----------------------------------------------------------------------------
-# define functions
-
-# http://stackoverflow.com/a/6212408
-
-function usage
-{
-
-    # TODO: do not use global variables
-    # TODO: space between << and 'EOT' makes a
-    # difference for atom syntax highlighting
-    # TODO: align properly and remove leading space when printing ?
-
-    read -r -d '' msg_tmpl <<'EOT'
-Usage: %s <config file>
-
-mandatory arguments:
-  config file           absolute path to configuration file
-
-optional arguments:
-  -?, --help            print this help message
-EOT
-
-    # shellcheck disable=SC2059
-    printf "${msg_tmpl}\\n" "${script_name}"
-}
-
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
-if [ $# -ne 1 ]
-then
-    usage
-    exit 1
-fi
-
-# http://stackoverflow.com/a/14203146
-while [ $# -gt 0 ]
-do
-    key="$1"
-
-    case "${key}" in
-      # NOTE: must escape -?, seems to act as wildcard otherwise
-      -\?|--help) usage; exit 1 ;;
-
-      *)  if [ -z "${config_file}" ]
-          then
-              config_file="$1"
-          else
-              usage
-              exit 1
-          fi
-    esac
-
-    # move past argument or value
-    shift
-done
-
-# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
-
-# config file is a mandatory command line argument
-if [ -z "${config_file}" ]
-then
-    usage
-    exit 1
-fi
-
-# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
-if [ ! -e "${config_file}" ]
-then
-    echo "${config_file}: No such file or directory"
-    exit 1
-fi
-
-if [ ! -r "${config_file}" ]
-then
-    echo "${config_file}: File is not readable"
-    exit 1
-fi
+if ! determine_platform;            then exit 1; fi
+if ! proc_cmd_line_args "$@";       then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -126,7 +40,7 @@ fi
 # http://mikefarah.github.io/yq
 config="$(yq r "${config_file}")"
 
-vault_host="$(      yq r - vault_host       <<< "${config}")"
+vault_address="$(   yq r - vault_address    <<< "${config}")"
 path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
 key_file_name="$(   yq r - key_file_name    <<< "${config}")"
 policies_folder="$( yq r - policies_folder  <<< "${config}")"
@@ -134,6 +48,10 @@ policies_folder="$( yq r - policies_folder  <<< "${config}")"
 # TODO: yq fails to support accessing substructures, so use jq
 services_json="$(   yq -j r - services      <<< "${config}")"
 users_json="$(      yq -j r - users         <<< "${config}")"
+
+
+# -----------------------------------------------------------------------------
+if ! validate_config_settings;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -150,44 +68,36 @@ users_json="$(      yq -j r - users         <<< "${config}")"
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
-# complete vault url
-vault_address="https://${vault_host}"
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit
+fi
 
 
 # -----------------------------------------------------------------------------
 # upload policies
-
-echo -n 'Get vault status: '
-
-# NOTE: from vault status --help:
-#   The exit code reflects the seal status:
-#       - 0 - unsealed
-#       - 1 - error
-#       - 2 - sealed
-
-output="$(vault status -address="${vault_address}" 2>&1)"
-res=$?
-if   [ "${res}" = 0 ]
-then
-    echo 'OK'
-elif [ "${res}" = 1 ]
-then
-    echo 'ERROR'
-    echo "${output}"
-    exit "${res}"
-else
-    echo 'OK'
-    echo "Vault at ${vault_address} is sealed; please unseal and try again"
-    exit "${res}"
-fi
-
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 # TODO: this fails, address is ignored
 # if output="$(vault login "${root_token}" -address="${vault_address}" 2>&1)"
 
-echo -n 'Log into vault: '
+echo -n 'log into vault: '
 if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
 then
     echo 'OK'
@@ -205,20 +115,29 @@ fi
 
 for service_name in ${service_names}
 do
+    echo "service ${service_name}:"
+
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${service_name}.hcl"
 
-    echo "Upload policies for service ${service_name}:"
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '  policy configuration file does not exist; not uploaded:'
+        echo "  ${path_to_conf_file}"
+        continue
+    fi
 
-    echo -n 'Create / update policy: '
+    echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
                        "${service_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
+
+    echo "  file uploaded: ${path_to_conf_file}"
 done
 
 if [ "${users_json}" != 'null' ]
@@ -228,9 +147,16 @@ fi
 
 for username in ${usernames}
 do
+    echo "user ${username}:"
+
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${username}.hcl"
 
-    echo "Upload policies for user ${username}:"
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '  policy configuration file does not exist; not uploaded:'
+        echo "  ${path_to_conf_file}"
+        continue
+    fi
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -284,14 +210,21 @@ do
     #       ... system/policy.html#create-update-policy:
     #   vault write sys/policy/my-policy policy=@my-policy.hcl
 
-    echo -n 'Create / update policy: '
+    echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
                        "${username}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
+
+    echo "  file uploaded: ${path_to_conf_file}"
 done
+
+
+echo
+echo 'HashiCorp Vault policy upload complete'
+echo

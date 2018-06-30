@@ -16,9 +16,8 @@ mgmt_user_name: ansible
 # name of the organization this is used for
 organization: DesmoDyne
 
-# vault host
-# https protocol / port 443 are implied
-vault_host: vault.desmodyne.com
+# vault server protocol, host and port
+vault_address: https://vault.desmodyne.com:443
 
 # path to vault log file on its host
 path_to_log_file: /var/log/vault/audit.log

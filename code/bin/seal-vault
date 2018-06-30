@@ -9,114 +9,23 @@
 # created : 2018-02-19
 
 
+echo
+echo 'Seal HashiCorp Vault'
+echo
+
+
 # https://www.vaultproject.io/api/system/seal.html
 
-# NOTE: see also init-vault for more information
-
-# TODO: move this to formal documentation of how these scripts work
-# NOTE: this script requires key information in json format;
-# this information is displayed by a vault only once, when it is initialized
-# and - as per convention - is stored as init.json in a secure location
-
 
 # -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
+# load functions from library and run as appropriate
 
-case "${OSTYPE}" in
-    darwin*)
-        ;;
-    linux-*)
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit -1
-        ;;
-esac
+# see also build-vault
 
+source vault.lib
 
-# -----------------------------------------------------------------------------
-# define functions
-
-# http://stackoverflow.com/a/6212408
-
-function usage
-{
-
-    # TODO: do not use global variables
-    # TODO: space between << and 'EOT' makes a
-    # difference for atom syntax highlighting
-    # TODO: align properly and remove leading space when printing ?
-
-    read -r -d '' msg_tmpl <<'EOT'
-Usage: %s <config file>
-
-mandatory arguments:
-  config file           absolute path to configuration file
-
-optional arguments:
-  -?, --help            print this help message
-EOT
-
-    # shellcheck disable=SC2059
-    printf "${msg_tmpl}\\n" "${script_name}"
-}
-
-
-# -----------------------------------------------------------------------------
-# process command line arguments
-
-# name of this script: http://stackoverflow.com/q/192319
-script_name="$(basename "$0")"
-
-if [ $# -ne 1 ]
-then
-    usage
-    exit 1
-fi
-
-# http://stackoverflow.com/a/14203146
-while [ $# -gt 0 ]
-do
-    key="$1"
-
-    case "${key}" in
-      # NOTE: must escape -?, seems to act as wildcard otherwise
-      -\?|--help) usage; exit 1 ;;
-
-      *)  if [ -z "${config_file}" ]
-          then
-              config_file="$1"
-          else
-              usage
-              exit 1
-          fi
-    esac
-
-    # move past argument or value
-    shift
-done
-
-# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
-
-# config file is a mandatory command line argument
-if [ -z "${config_file}" ]
-then
-    usage
-    exit 1
-fi
-
-# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
-if [ ! -e "${config_file}" ]
-then
-    echo "${config_file}: No such file or directory"
-    exit 1
-fi
-
-if [ ! -r "${config_file}" ]
-then
-    echo "${config_file}: File is not readable"
-    exit 1
-fi
+if ! determine_platform;            then exit 1; fi
+if ! proc_cmd_line_args "$@";       then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -129,9 +38,13 @@ fi
 # http://mikefarah.github.io/yq
 config="$(yq r "${config_file}")"
 
-vault_host="$(     yq r - vault_host      <<< "${config}")"
+vault_address="$(  yq r - vault_address   <<< "${config}")"
 path_to_sec_loc="$(yq r - path_to_sec_loc <<< "${config}")"
 key_file_name="$(  yq r - key_file_name   <<< "${config}")"
+
+
+# -----------------------------------------------------------------------------
+if ! validate_config_settings;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -140,41 +53,34 @@ key_file_name="$(  yq r - key_file_name   <<< "${config}")"
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
-# complete vault url
-vault_address="https://${vault_host}"
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is already sealed"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit
+fi
 
 
 # -----------------------------------------------------------------------------
 # seal vault
 
-echo -n 'Get vault status: '
-
-# NOTE: from vault status --help:
-#   The exit code reflects the seal status:
-#       - 0 - unsealed
-#       - 1 - error
-#       - 2 - sealed
-
-output="$(vault status -address="${vault_address}" 2>&1)"
-res=$?
-if   [ "${res}" = 0 ]
-then
-    echo 'OK'
-elif [ "${res}" = 1 ]
-then
-    echo 'ERROR'
-    echo "${output}"
-    exit "${res}"
-else
-    echo 'OK'
-    echo "Vault at ${vault_address} is already sealed"
-    exit "${res}"
-fi
-
 # TODO: can this be done with a user token obtained by login ?
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-echo -n 'Seal vault: '
+echo -n 'seal vault: '
 if output="$(curl --header "X-Vault-Token: ${root_token}" \
                   --request PUT                           \
                   --show-error                            \
@@ -185,8 +91,6 @@ then
     if [ -z "${output}" ]
     then
         echo 'OK'
-        echo 'Vault has been sealed'
-        exit 0
     else
         echo 'ERROR'
         # sample output:
@@ -204,3 +108,8 @@ else
     echo "${output}"
     exit 1
 fi
+
+
+echo
+echo 'HashiCorp Vault seal complete'
+echo
