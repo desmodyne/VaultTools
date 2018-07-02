@@ -11,9 +11,22 @@
 # compose file version 2 reference:
 # https://docs.docker.com/compose/compose-file/compose-file-v2
 
+# TODO: refactor hardcoded locations to parameters
+
 version: "2"
 
 services:
+  vault_client:
+    # TODO: supplying build context is pointless, image must be built using
+    # .../cicd/bin/build-basic-images - is there a way to integrate this ?
+    # build:
+    #   context: ../ci-vault-client
+    command: /opt/vault/build-vault /opt/vault/conf/vault.localhost.DesmoDyne.yaml
+    container_name: ct-vault-client
+    image: ci-vault-client
+    networks:
+      - vault_net
+
   vault_server:
     build:
       context: ../ci-vault-server
