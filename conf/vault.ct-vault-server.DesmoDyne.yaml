@@ -22,6 +22,10 @@ path_to_log_file: /vault/logs/audit.log
 # TODO: use better location
 path_to_sec_loc: /tmp
 
+# absolute path to folder with templates
+# TODO: this must be in sync with Docker locations
+path_to_tmpl_folder: /opt/vault/tmpl
+
 # name of file with keys to unseal vault, relative to path_to_sec_loc
 key_file_name: init.json
 

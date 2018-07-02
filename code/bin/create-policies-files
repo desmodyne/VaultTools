@@ -35,8 +35,9 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # http://mikefarah.github.io/yq
 config="$(yq r "${config_file}")"
 
-path_to_sec_loc="$(yq r - path_to_sec_loc <<< "${config}")"
-policies_folder="$(yq r - policies_folder <<< "${config}")"
+path_to_sec_loc="$(    yq r - path_to_sec_loc     <<< "${config}")"
+path_to_tmpl_folder="$(yq r - path_to_tmpl_folder <<< "${config}")"
+policies_folder="$(    yq r - policies_folder     <<< "${config}")"
 
 # TODO: yq fails to support accessing substructures, so use jq
 services_json="$(  yq -j r - services     <<< "${config}")"
@@ -59,9 +60,6 @@ rel_path_to_project_root='../..'
 # absolute path to project root
 path_to_project_root="$(realpath \
                         "${path_to_this_script}/${rel_path_to_project_root}")"
-
-# path to folder with templates, relative to project root
-path_to_tmpl_folder='data/tmpl'
 
 # name of service policy template file
 serv_tmpl_file_name='service_policy.hcl.j2'
