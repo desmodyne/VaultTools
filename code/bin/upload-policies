@@ -85,7 +85,7 @@ esac
 
 if [ "${res}" != 0 ]
 then
-    exit
+    exit "${res}"
 fi
 
 

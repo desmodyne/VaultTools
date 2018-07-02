@@ -78,7 +78,7 @@ then
     echo
     echo 'HashiCorp Vault instance unseal complete'
     echo
-    exit
+    exit "${res}"
 fi
 
 

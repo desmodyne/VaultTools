@@ -88,8 +88,7 @@ then
     echo
     echo 'HashiCorp Vault instance initialization complete'
     echo
-    # TODO: review exit code
-    exit
+    exit "${res}"
 fi
 
 
