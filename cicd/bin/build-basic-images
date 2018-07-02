@@ -1,0 +1,353 @@
+#!/usr/bin/env bash
+
+# build-basic-images
+#
+# build Docker container images defined by only a Dockerfile
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2017-05-26
+
+
+# TODO: refactor this script to using an established tool (Kubernetes ?!?)
+# TODO: error handling around using jq and assuming paths being available
+# TODO: review / align script log output, especially during error handling
+# TODO: do stuff only if required - how to determine if stuff is required ?
+# TODO: verify required executables are available before attempting to use them;
+#  1. inspect PATH and add e.g. /usr/local/bin, then re-try
+#  2. if not found, display error message to tell user how to install, e.g.
+#
+# NOTE: on OS X, install required tools using
+#   brew install coreutils jq
+# http://brew.sh/
+# http://apple.stackexchange.com/a/69332
+
+
+echo
+echo 'build basic Docker container images'
+echo
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: running this on Linux as a non-privileged user
+# requires adding that user to the docker group
+# TODO: call (2009 MBP) can not run Docker natively,
+# alexa (2015 MBP) can; both run the same operation system
+
+case "${OSTYPE}" in
+    darwin*)
+        ;;
+    linux-*)
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit 1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# define functions
+
+# http://stackoverflow.com/a/6212408
+
+function usage
+{
+
+    # TODO: do not use global variables
+    # TODO: space between << and 'EOT' makes a
+    # difference for atom syntax highlighting
+    # TODO: align properly and remove leading space when printing ?
+
+    read -r -d '' msg_tmpl <<'EOT'
+Usage: %s <config file>
+
+mandatory arguments:
+  config file           absolute path to configuration file
+
+optional arguments:
+  -?, --help            print this help message
+EOT
+
+    # shellcheck disable=SC2059
+    printf "${msg_tmpl}\\n" "${script_name}"
+}
+
+
+# -----------------------------------------------------------------------------
+# process command line arguments
+
+# name of this script: http://stackoverflow.com/q/192319
+script_name="$(basename "$0")"
+
+if [ $# -ne 1 ]
+then
+    usage
+    exit 1
+fi
+
+# http://stackoverflow.com/a/14203146
+while [ $# -gt 0 ]
+do
+    key="$1"
+
+    case "${key}" in
+      # NOTE: must escape -?, seems to act as wildcard otherwise
+      -\?|--help) usage; exit 1 ;;
+
+      *)  if [ -z "${config_file}" ]
+          then
+              config_file="$1"
+          else
+              usage
+              exit 1
+          fi
+    esac
+
+    # move past argument or value
+    shift
+done
+
+# TODO: try to use ~/.<script_name>.yaml or so if no config file is passed ?
+
+# config file is a mandatory command line argument
+if [ -z "${config_file}" ]
+then
+    usage
+    exit 1
+fi
+
+# http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_07_01.html
+if [ ! -e "${config_file}" ]
+then
+    echo "${config_file}: No such file or directory"
+    exit 1
+fi
+
+if [ ! -r "${config_file}" ]
+then
+    echo "${config_file}: File is not readable"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
+# path to folder with Docker files, relative to project root
+path_to_docker_folder='code/docker'
+
+# TODO: get these from config file ?
+
+# secrets file template
+read -r -d '' secrets_file_tmpl <<'EOT'
+role_id:%s
+secret_id:%s
+EOT
+
+# path to file with secrets, relative to Docker folder
+path_to_secrets_file='secrets'
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# NOTE: see config file for parameter documentation
+# TODO: error handling, e.g. check if json / yaml keys are available
+
+# http://mikefarah.github.io/yq
+config="$(yq r "${config_file}")"
+
+vault_addr="$(yq r - vault_addr <<< "${config}")"
+
+# NOTE: this essentially converts YAML to JSON
+cont_image_data="$(yq r -j - basic_images <<< "${config}")"
+
+
+# -----------------------------------------------------------------------------
+# build basic Docker images
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "Failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
+
+image_names="$(jq -r 'keys[]' <<< "${cont_image_data}" | sort)"
+
+for image_name in ${image_names}
+do
+    echo "container image name: ${image_name}"
+    echo
+
+    image_path="${path_to_docker_folder}/${image_name}"
+
+    if [ ! -f "${image_path}/Dockerfile" ]
+    then
+        echo 'Failed to find Dockerfile at'
+        echo "  $(realpath "${image_path}")"
+        exit 1
+    fi
+
+    echo "build ${image_name} at"
+    echo "  $(realpath "${image_path}"):"
+    echo
+
+    # TODO: continue or exit ?
+    # TODO: review error handling / output / exit code
+
+    # https://unix.stackexchange.com/a/76407
+    if ! files_to_copy="$(jq -r ".\"${image_name}\".files_to_copy[]" \
+             <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if ! tag="$(jq -r ".\"${image_name}\".image_tag" <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if ! vault_auth_path="$(jq -r ".\"${image_name}\".vault_auth_path" \
+             <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    orig_IFS="${IFS}"
+    IFS=$'\n'
+
+    files_to_delete=''
+
+    # TODO: do this in a single command
+    for file_to_copy in ${files_to_copy}
+    do
+        if [ -d "${file_to_copy}" ]
+        then
+            if ! cp -a "${file_to_copy}" "${image_path}/"
+            then
+                exit 1
+            fi
+        else
+            if ! cp "${file_to_copy}" "${image_path}/"
+            then
+                exit 1
+            fi
+        fi
+
+        # TODO: this fails with space in folder / filename
+        files_to_delete+="${image_path}/$(basename "${file_to_copy}") "
+    done
+
+    IFS="${orig_IFS}"
+
+    if [ "${vault_auth_path}" != 'null' ]
+    then
+        # TODO: these require that the host this script runs on
+        #       is logged into vault with adequate permissions
+
+        # TODO: use -format for json or yaml output format ?
+        if output="$(vault  read                      \
+                           -address="${vault_addr}"   \
+                            "${vault_auth_path}/role-id" 2>&1)"
+        then
+            vault_response="${output}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(grep 'role_id ' <<< "${vault_response}" 2>&1)"
+        then
+            role_id="${output##* }"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(vault  write                     \
+                           -address="${vault_addr}"   \
+                           -force                     \
+                            "${vault_auth_path}/secret-id" 2>&1)"
+        then
+            vault_response="${output}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(grep 'secret_id ' <<< "${vault_response}" 2>&1)"
+        then
+            secret_id="${output##* }"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(printf "${secrets_file_tmpl}" \
+                            "${role_id}" "${secret_id}" 2>&1)"
+        then
+            echo "${output}" > "${image_path}/${path_to_secrets_file}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+    fi
+
+    if ! docker build --tag "${image_name}:${tag}" "${image_path}"
+    then
+        exit 1
+    fi
+
+    if [ -e "${image_path}/${path_to_secrets_file}" ]
+    then
+        rm "${image_path}/${path_to_secrets_file}"
+    fi
+
+    # TODO: do this in a single command
+    for file_to_delete in ${files_to_delete}
+    do
+        if [ -d "${file_to_delete}" ]
+        then
+            # https://github.com/koalaman/shellcheck/wiki/SC2115
+            if ! rm -r "${file_to_delete}"
+            then
+                exit 1
+            fi
+        else
+            if ! rm "${file_to_delete}"
+            then
+                exit 1
+            fi
+        fi
+    done
+
+    echo
+    echo "container image ${image_name} complete"
+    echo
+done
+
+
+if ! popd > /dev/null
+then
+    echo "Failed to popd from project root ${path_to_project_root}"
+    exit
+fi
+
+
+echo 'basic Docker container images build complete'
+echo

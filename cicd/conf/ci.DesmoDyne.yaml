@@ -1,0 +1,24 @@
+---
+# ci.<organization>.yaml
+#
+# <organization> YAML configuration file for Docker container images
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-05-29
+
+
+# list of data sets to configure basic container images
+basic_images:
+
+  # name of the container image; for every image, a Dockerfile is expected in
+  # the image build folder .../Infrastructure/Docker/code/docker/<image name>/
+  ci-vault-client:
+    # list of files to copy into the image build folder prior to building
+    # the image; will be deleted once the image was built successfully
+    files_to_copy:
+    - code/bin
+    - conf
+    - data/tmpl
+    # container image tag
+    image_tag: latest
