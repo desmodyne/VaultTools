@@ -1,0 +1,113 @@
+---
+# vault.<id>.<organization>.yaml
+#
+# <organization> / <id> YAML configuration file for HashiCorp vault scripts
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-19
+
+
+# vault server protocol, host and port
+vault_address: http://ct-vault-server:8200
+
+# path to vault log file on its host
+# NOTE: this must be in sync with the log folder /vault/logs
+# hardcoded verbatim multiple times in base Dockerfile at
+# https://github.com/hashicorp/docker-vault/blob/master/0.X/Dockerfile
+# TODO: does this conf item really belong in here ?
+path_to_log_file: /vault/logs/audit.log
+
+# absolute path to secure location with master key and root token info
+# TODO: use better location
+path_to_sec_loc: /tmp
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name: init.json
+
+# path to folder with policy files, relative to path_to_sec_loc
+policies_folder: policies
+
+# path to folder with secrets config files, relative to path_to_sec_loc
+# TODO: really mix service and user secret files in the same folder ?
+secrets_folder: secrets
+
+# path to folder with users config files, relative to path_to_sec_loc
+users_folder: users
+
+# password placeholder string
+placeholder: TODO
+
+# secrets to be created in vault
+secrets:
+
+# secrets to be created for services
+- context: service
+
+  # a sec_conf is a path into vault and secrets stored under it
+  sec_confs:
+
+  # path into vault secrets underneath each
+  # service's area secret/service/<service name>/<application name>
+  # TODO: it might not be safe to store secrets keys in conf
+
+  - path: some_service
+    secrets:
+    - some_password
+    - another_password
+    - yet_another_secret
+
+# secrets to be created for every user
+# TODO: review this vs. users section
+- context: user
+
+  # a sec_conf is a path into vault and secrets stored under it
+  sec_confs:
+
+  # path into vault secrets underneath each user's area secret/user/<username>
+
+  # path is empty --> secrets are stored at secret/user/<username> "root"
+  - path:
+    secrets:
+    - a_secret_for_this_user_only
+    - another_secret_for_this_user_only
+    - a_third_secret_for_this_user
+
+# services - TODO: is this required ?
+services:
+- name: some_service
+
+# users to be created in vault for userpass auth method
+users:
+
+# policies in vault:
+# https://www.vaultproject.io/intro/getting-started/policies.html
+# https://www.vaultproject.io/docs/concepts/policies.html
+# https://www.vaultproject.io/guides/configuration/policies.html
+
+# NOTE: regular users will be assigned a policy
+# at runtime that has the same name as the user
+
+- name: kr1sp1n
+  policies:
+  - default
+
+- name: shorty
+  policies:
+  - default
+
+- name: ssc
+  policies:
+  - default
+
+- name: test
+  policies:
+  - default
+
+# https://www.vaultproject.io/api/system/init.html#parameters
+
+# number of shares to split the master key into
+secret_shares: 5
+
+# number of shares required to reconstruct the master key
+secret_threshold: 3

@@ -14,9 +14,12 @@
 FROM vault:latest
 MAINTAINER Stefan Schablowski <stefan.schablowski@desmodyne.com>
 
-# install bash, required by client scripts
+# install tools required by client scripts
 # https://stackoverflow.com/a/40944512
-RUN apk update && apk add --no-cache bash
+# TODO: rm /var/cache/apk/* ?
+# TODO: update yq 1.15 to latest 2.0.1
+RUN apk update && apk add --no-cache bash curl jq && \
+    wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/1.15.0/yq_linux_amd64 && chmod a+x /usr/local/bin/yq
 
 # ARG vs ENV: https://stackoverflow.com/a/41919137
 
