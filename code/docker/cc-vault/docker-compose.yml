@@ -15,10 +15,12 @@ version: "2"
 
 services:
   vault_server:
+    build:
+      context: ../ci-vault-server
     cap_add: [ IPC_LOCK ]
     command: vault server -config /vault/config
-    container_name: ct-vault
-    image: ci-vault
+    container_name: ct-vault-server
+    image: ci-vault-server
     ports:
       - "8200:8200"
     networks:
