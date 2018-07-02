@@ -1,0 +1,29 @@
+---
+# docker-compose.yml
+#
+# HashiCorp Vault client & server Docker composition
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-07-03
+
+
+# compose file version 2 reference:
+# https://docs.docker.com/compose/compose-file/compose-file-v2
+
+version: "2"
+
+services:
+  vault_server:
+    cap_add: [ IPC_LOCK ]
+    command: vault server -config /vault/config
+    container_name: ct-vault
+    image: ci-vault
+    ports:
+      - "8200:8200"
+    networks:
+      - vault_net
+
+networks:
+  vault_net:
+    driver: bridge
