@@ -21,7 +21,7 @@ services:
     # .../cicd/bin/build-basic-images - is there a way to integrate this ?
     # build:
     #   context: ../ci-vault-client
-    command: /opt/vault/build-vault /opt/vault/conf/vault.localhost.DesmoDyne.yaml
+    command: /opt/vault/bin/build-vault /opt/vault/conf/vault.localhost.DesmoDyne.yaml
     container_name: ct-vault-client
     image: ci-vault-client
     networks:
