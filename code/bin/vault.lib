@@ -271,6 +271,9 @@ EOT
 # -----------------------------------------------------------------------------
 function validate_config_settings
 {
+    echo 'temporarily skip validation of configuration settings'
+    return
+
     echo -n 'validate configuration settings: '
 
     # TODO: verify path_to_sec_loc is an absolute path ?
@@ -330,6 +333,9 @@ function validate_config_settings
 # -----------------------------------------------------------------------------
 function validate_secure_location
 {
+    echo 'temporarily skip validation of secure location'
+    return
+
     echo -n 'verify secure location is a valid folder: '
 
     if [ ! -d "${path_to_sec_loc}" ]
