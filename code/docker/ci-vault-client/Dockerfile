@@ -18,8 +18,11 @@ MAINTAINER Stefan Schablowski <stefan.schablowski@desmodyne.com>
 # https://stackoverflow.com/a/40944512
 # TODO: rm /var/cache/apk/* ?
 # TODO: update yq 1.15 to latest 2.0.1
-RUN apk update && apk add --no-cache bash curl jq && \
-    wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/1.15.0/yq_linux_amd64 && chmod a+x /usr/local/bin/yq
+RUN apk update && apk add --no-cache bash curl jq python py-pip && \
+    wget -O /usr/local/bin/yq \
+        https://github.com/mikefarah/yq/releases/download/1.15.0/yq_linux_amd64 && \
+    chmod a+x /usr/local/bin/yq && \
+    pip install --upgrade pip && pip install j2cli
 
 # ARG vs ENV: https://stackoverflow.com/a/41919137
 
