@@ -114,14 +114,14 @@ if [ "${services_json}" = 'null' ]
 then
     echo 'no services configured; skip uploading service policy files'
 else
-    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+    serv_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
 fi
 
-for service_name in ${service_names}
+for serv_name in ${serv_names}
 do
-    echo "service ${service_name}:"
+    echo "service ${serv_name}:"
 
-    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${service_name}.hcl"
+    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${serv_name}.hcl"
 
     if [ ! -e "${path_to_conf_file}" ]
     then
@@ -132,7 +132,7 @@ do
 
     echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
-                       "${service_name}" "${path_to_conf_file}" 2>&1)"
+                       "${serv_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else
@@ -148,14 +148,14 @@ if [ "${users_json}" = 'null' ]
 then
     echo 'no users configured; skip uploading user policy files'
 else
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 
-for username in ${usernames}
+for user_name in ${user_names}
 do
-    echo "user ${username}:"
+    echo "user ${user_name}:"
 
-    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${username}.hcl"
+    path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${user_name}.hcl"
 
     if [ ! -e "${path_to_conf_file}" ]
     then
@@ -182,7 +182,7 @@ do
     #                   --request POST                          \
     #                   --show-error                            \
     #                   --silent                                \
-    #               "${vault_address}/v1/sys/policy/${username}" 2>&1)"
+    #               "${vault_address}/v1/sys/policy/${user_name}" 2>&1)"
     # then
     #     # if successful, curl returns 0 and output is empty
     #     if [ -z "${output}" ]
@@ -218,7 +218,7 @@ do
 
     echo -n '  upload policy: '
     if output="$(vault policy write -address="${vault_address}" \
-                       "${username}" "${path_to_conf_file}" 2>&1)"
+                       "${user_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
     else

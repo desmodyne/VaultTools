@@ -8,13 +8,13 @@
 
 
 # under their own path, every user can do anything
-path "secret/user/{{ username }}/*"
+path "secret/user/{{ user_name }}/*"
 {
     capabilities = ["create", "read", "update", "delete", "list"]
 }
 
 # in their own root path, every user can read and list
-path "secret/user/{{ username }}"
+path "secret/user/{{ user_name }}"
 {
     capabilities = ["read", "list"]
 }

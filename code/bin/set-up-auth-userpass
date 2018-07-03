@@ -91,7 +91,7 @@ then
     echo
     exit
 else
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 
 
@@ -180,11 +180,11 @@ else
 fi
 
 
-for username in ${usernames}
+for user_name in ${user_names}
 do
-    echo "user ${username}:"
+    echo "user ${user_name}:"
 
-    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${username}.json"
+    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${user_name}.json"
 
     if [ ! -e "${path_to_conf_file}" ]
     then
@@ -216,7 +216,7 @@ do
                       --request POST                          \
                       --show-error                            \
                       --silent                                \
-                  "${vault_address}/v1/auth/userpass/users/${username}" 2>&1)"
+                  "${vault_address}/v1/auth/userpass/users/${user_name}" 2>&1)"
     then
         # if successful, curl returns 0 and output is empty
         if [ -z "${output}" ]

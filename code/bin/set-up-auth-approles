@@ -91,7 +91,7 @@ then
     echo
     exit
 else
-    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+    serv_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
 fi
 
 
@@ -154,19 +154,19 @@ else
 fi
 
 
-for service_name in ${service_names}
+for serv_name in ${serv_names}
 do
-    echo "service ${service_name}: "
+    echo "service ${serv_name}: "
 
     echo -n "  add approle role: "
 
     # TODO: test if user exists and output 'overwriting' message
-    if output="$(curl --data "{\"policies\": \"${service_name}\"}"  \
+    if output="$(curl --data "{\"policies\": \"${serv_name}\"}"  \
                       --header "X-Vault-Token: ${root_token}"       \
                       --request POST                                \
                       --show-error                                  \
                       --silent                                      \
-                  "${vault_address}/v1/auth/approle/role/${service_name}" 2>&1)"
+                  "${vault_address}/v1/auth/approle/role/${serv_name}" 2>&1)"
     then
         # if successful, curl returns 0 and output is empty
         if [ -z "${output}" ]

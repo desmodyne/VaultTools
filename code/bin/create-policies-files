@@ -121,18 +121,18 @@ if [ "${services_json}" = 'null' ]
 then
     echo 'no services configured; skip creating service policy files'
 else
-    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+    serv_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
 fi
 
-for service_name in ${service_names}
+for serv_name in ${serv_names}
 do
-    echo "service ${service_name}:"
+    echo "service ${serv_name}:"
 
-    path_to_conf_file="${path_to_policies_folder}/${service_name}.hcl"
+    path_to_conf_file="${path_to_policies_folder}/${serv_name}.hcl"
 
     echo -n '  render template data template: '
     # j2 --format env requires export
-    export service_name="${service_name}"
+    export serv_name="${serv_name}"
     if output="$(j2 --format env \
                      "${path_to_tmpl_folder}/${serv_tmpl_data_tmpl_name}" 2>&1)"
     then
@@ -143,7 +143,7 @@ do
         echo "  ${output}"
         exit 1
     fi
-    export service_name=
+    export serv_name=
 
     echo -n '  create policies configuration file: '
 
@@ -172,18 +172,18 @@ if [ "${users_json}" = 'null' ]
 then
     echo 'no users configured; skip creating user policy files'
 else
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 
-for username in ${usernames}
+for user_name in ${user_names}
 do
-    echo "user ${username}:"
+    echo "user ${user_name}:"
 
-    path_to_conf_file="${path_to_policies_folder}/${username}.hcl"
+    path_to_conf_file="${path_to_policies_folder}/${user_name}.hcl"
 
     echo -n '  render template data template: '
     # j2 --format env requires export
-    export username="${username}"
+    export user_name="${user_name}"
     if output="$(j2 --format env \
                      "${path_to_tmpl_folder}/${user_tmpl_data_tmpl_name}" 2>&1)"
     then
@@ -194,7 +194,7 @@ do
         echo "  ${output}"
         exit 1
     fi
-    export username=
+    export user_name=
 
     echo -n '  create policies configuration file: '
 

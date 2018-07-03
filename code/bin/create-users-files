@@ -87,7 +87,7 @@ then
     echo
     exit
 else
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 
 
@@ -113,21 +113,21 @@ fi
 
 # TODO: continue or exit ?
 
-for username in ${usernames}
+for user_name in ${user_names}
 do
-    echo "user ${username}:"
+    echo "user ${user_name}:"
 
-    policies="$(jq -r ".[] | select(.name == \"${username}\").policies[]" \
+    policies="$(jq -r ".[] | select(.name == \"${user_name}\").policies[]" \
                   <<< "${users_json}" | xargs | sed -e 's| |,|g')"
 
     # append policy for regular users
-    if [ "${username}" != 'root' ]
+    if [ "${user_name}" != 'root' ]
     then
-        policies+=",${username}"
+        policies+=",${user_name}"
     fi
 
-    path_to_conf_file="${path_to_users_folder}/${username}.json"
-    path_to_temp_file="${path_to_users_folder}/${username}.json.temp"
+    path_to_conf_file="${path_to_users_folder}/${user_name}.json"
+    path_to_temp_file="${path_to_users_folder}/${user_name}.json.temp"
 
     # attempt to get password from existing file
     if [ -f "${path_to_conf_file}" ]
