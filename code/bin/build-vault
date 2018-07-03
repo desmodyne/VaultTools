@@ -82,3 +82,8 @@ if ! set-up-auth-userpass  "${config_file}"; then exit 1; fi
 echo
 echo 'HashiCorp Vault instance build complete'
 echo
+
+# TODO: remove this once development is complete
+# echo
+# echo 'keep container running for inspection'
+# tail -f /dev/null
