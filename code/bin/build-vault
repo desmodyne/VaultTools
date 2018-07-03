@@ -31,7 +31,7 @@ req_tools+='upload-policies upload-secrets'
 # load functions from library and run as appropriate
 
 # TODO: review path to library
-source vault.lib
+source /opt/vault/bin/vault.lib
 
 if ! determine_platform;            then exit 1; fi
 # pass all arguments to this script
@@ -82,3 +82,8 @@ if ! set-up-auth-userpass  "${config_file}"; then exit 1; fi
 echo
 echo 'HashiCorp Vault instance build complete'
 echo
+
+# TODO: remove this once development is complete
+# echo
+# echo 'keep container running for inspection'
+# tail -f /dev/null

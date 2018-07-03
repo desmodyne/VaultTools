@@ -1,0 +1,72 @@
+---
+# vault.<id>.<organization>.yaml
+#
+# <organization> / <id> YAML configuration file for HashiCorp vault scripts
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-19
+
+
+# vault server protocol, host and port
+vault_address: http://ct-vault-server:8200
+
+# TODO: do these conf items really belong in here ?
+
+# absolute path in vault server container to vault log file
+# NOTE: this must be in sync with the log folder /vault/logs
+# hardcoded verbatim multiple times in base Dockerfile at
+# https://github.com/hashicorp/docker-vault/blob/master/0.X/Dockerfile
+path_to_log_file: /vault/logs/audit.log
+
+# absolute path in vault client container to secure location
+# with vault master key and root token info - PROTECT THIS!!
+# TODO: this is runtime data, so e.g. /var/lib/vault/secrets ?
+path_to_sec_loc: /opt/vault/secrets
+
+# absolute path in vault client container to folder with templates
+# TODO: this is extra data, so e.g. /var/lib/vault/templates ?
+# TODO: this must be in sync with paths assembled from vault_folder in
+# ci-vault-client Dockerfile and files_to_copy paths in build-basic-images conf
+path_to_tmpl_folder: /opt/vault/tmpl
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name: init.json
+
+# path to folder with policy files, relative to path_to_sec_loc
+policies_folder: policies
+
+# path to folder with secrets config files, relative to path_to_sec_loc
+# TODO: really mix service and user secret files in the same folder ?
+secrets_folder: secrets
+
+# path to folder with users config files, relative to path_to_sec_loc
+users_folder: users
+
+# password placeholder string
+placeholder: TODO
+
+# secrets to be created in vault
+secrets:
+
+# secrets to be created for services
+- context: service
+
+  # a sec_conf is a path into vault and secrets stored under it
+  sec_confs:
+
+  # path into vault secrets underneath each service's area secret/service/<path>
+  # TODO: it might not be safe to store secrets keys in conf
+  - path: some_service
+    secrets:
+    - some_password
+    - another_password
+    - yet_another_secret
+
+# https://www.vaultproject.io/api/system/init.html#parameters
+
+# number of shares to split the master key into
+secret_shares: 5
+
+# number of shares required to reconstruct the master key
+secret_threshold: 3

@@ -38,14 +38,19 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # TODO: review output, message only if error or -v / --verbose
 
 # http://mikefarah.github.io/yq
-config="$(yq r "${config_file}")"
+config="$(yq -j r "${config_file}")"
 
-vault_address="$(   yq r - vault_address    <<< "${config}")"
-path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
-key_file_name="$(   yq r - key_file_name    <<< "${config}")"
+vault_address="$(   jq -r '.vault_address'    <<< "${config}")"
+path_to_sec_loc="$( jq -r '.path_to_sec_loc'  <<< "${config}")"
+key_file_name="$(   jq -r '.key_file_name'    <<< "${config}")"
 
-# TODO: yq fails to support accessing substructures, so use jq
-services_json="$(   yq -j r - services      <<< "${config}")"
+# compound configuration sections
+secrets_json="$(       jq -r '.secrets'             <<< "${config}")"
+
+# TODO: review jq exprs to make these scalable beyond one path
+
+# json data structure with secrets for each service
+serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets_json}")"
 
 
 # -----------------------------------------------------------------------------
@@ -75,12 +80,25 @@ esac
 
 if [ "${res}" != 0 ]
 then
-    exit
+    exit "${res}"
 fi
 
 
 # -----------------------------------------------------------------------------
 # set up approle authentication
+
+
+if [ -z "${serv_secrets}" ]
+then
+    echo 'no services configured; skip setting up approle authentication'
+    echo
+    echo 'HashiCorp Vault AppRole authentication setup complete'
+    echo
+    exit
+else
+    serv_names="$(jq -r '.sec_confs[].path' <<< "${serv_secrets}" | xargs)"
+fi
+
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
@@ -141,24 +159,19 @@ else
 fi
 
 
-if [ "${services_json}" != 'null' ]
-then
-    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
-fi
-
-for service_name in ${service_names}
+for serv_name in ${serv_names}
 do
-    echo "service ${service_name}: "
+    echo "service ${serv_name}: "
 
     echo -n "  add approle role: "
 
     # TODO: test if user exists and output 'overwriting' message
-    if output="$(curl --data "{\"policies\": \"${service_name}\"}"  \
+    if output="$(curl --data "{\"policies\": \"${serv_name}\"}"  \
                       --header "X-Vault-Token: ${root_token}"       \
                       --request POST                                \
                       --show-error                                  \
                       --silent                                      \
-                  "${vault_address}/v1/auth/approle/role/${service_name}" 2>&1)"
+                  "${vault_address}/v1/auth/approle/role/${serv_name}" 2>&1)"
     then
         # if successful, curl returns 0 and output is empty
         if [ -z "${output}" ]

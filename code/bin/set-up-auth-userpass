@@ -36,16 +36,16 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # TODO: review output, message only if error or -v / --verbose
 
 # http://mikefarah.github.io/yq
-config="$(yq r "${config_file}")"
+config="$(yq -j r "${config_file}")"
 
-vault_address="$(   yq r - vault_address    <<< "${config}")"
-path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
-key_file_name="$(   yq r - key_file_name    <<< "${config}")"
-users_folder="$(    yq r - users_folder     <<< "${config}")"
-placeholder="$(     yq r - placeholder      <<< "${config}")"
+vault_address="$(   jq -r '.vault_address'    <<< "${config}")"
+path_to_sec_loc="$( jq -r '.path_to_sec_loc'  <<< "${config}")"
+key_file_name="$(   jq -r '.key_file_name'    <<< "${config}")"
+users_folder="$(    jq -r '.users_folder'     <<< "${config}")"
+placeholder="$(     jq -r '.placeholder'      <<< "${config}")"
 
-# TODO: yq fails to support accessing substructures, so use jq
-users_json="$(      yq -j r - users         <<< "${config}")"
+# compound configuration sections
+users_json="$(      jq -r '.users'            <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------
@@ -75,12 +75,25 @@ esac
 
 if [ "${res}" != 0 ]
 then
-    exit
+    exit "${res}"
 fi
 
 
 # -----------------------------------------------------------------------------
 # set up userpass authentication
+
+
+if [ "${users_json}" = 'null' ]
+then
+    echo 'no users configured; skip setting up userpass authentication'
+    echo
+    echo 'HashiCorp Vault UserPass authentication setup complete'
+    echo
+    exit
+else
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+fi
+
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
@@ -167,16 +180,11 @@ else
 fi
 
 
-if [ "${users_json}" != 'null' ]
-then
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
-fi
-
-for username in ${usernames}
+for user_name in ${user_names}
 do
-    echo "user ${username}:"
+    echo "user ${user_name}:"
 
-    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${username}.json"
+    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${user_name}.json"
 
     if [ ! -e "${path_to_conf_file}" ]
     then
@@ -208,7 +216,7 @@ do
                       --request POST                          \
                       --show-error                            \
                       --silent                                \
-                  "${vault_address}/v1/auth/userpass/users/${username}" 2>&1)"
+                  "${vault_address}/v1/auth/userpass/users/${user_name}" 2>&1)"
     then
         # if successful, curl returns 0 and output is empty
         if [ -z "${output}" ]

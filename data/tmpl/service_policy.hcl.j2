@@ -8,13 +8,13 @@
 
 
 # under their own path, every service can do anything
-path "secret/service/{{ service_name }}/*"
+path "secret/service/{{ serv_name }}/*"
 {
     capabilities = ["create", "read", "update", "delete", "list"]
 }
 
 # in their own root path, every service can read and list
-path "secret/service/{{ service_name }}"
+path "secret/service/{{ serv_name }}"
 {
     capabilities = ["read", "list"]
 }
