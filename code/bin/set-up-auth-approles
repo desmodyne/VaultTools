@@ -82,6 +82,19 @@ fi
 # -----------------------------------------------------------------------------
 # set up approle authentication
 
+
+if [ "${services_json}" = 'null' ]
+then
+    echo 'no services configured; skip setting up approle authentication'
+    echo
+    echo 'HashiCorp Vault AppRole authentication setup complete'
+    echo
+    exit
+else
+    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+fi
+
+
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 echo -n 'log into vault: '
@@ -140,11 +153,6 @@ else
     fi
 fi
 
-
-if [ "${services_json}" != 'null' ]
-then
-    service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
-fi
 
 for service_name in ${service_names}
 do

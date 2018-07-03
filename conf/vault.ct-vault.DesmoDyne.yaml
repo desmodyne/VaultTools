@@ -55,62 +55,13 @@ secrets:
   # a sec_conf is a path into vault and secrets stored under it
   sec_confs:
 
-  # path into vault secrets underneath each
-  # service's area secret/service/<service name>/<application name>
+  # path into vault secrets underneath each service's area secret/service/<path>
   # TODO: it might not be safe to store secrets keys in conf
-
   - path: some_service
     secrets:
     - some_password
     - another_password
     - yet_another_secret
-
-# secrets to be created for every user
-# TODO: review this vs. users section
-- context: user
-
-  # a sec_conf is a path into vault and secrets stored under it
-  sec_confs:
-
-  # path into vault secrets underneath each user's area secret/user/<username>
-
-  # path is empty --> secrets are stored at secret/user/<username> "root"
-  - path:
-    secrets:
-    - a_secret_for_this_user_only
-    - another_secret_for_this_user_only
-    - a_third_secret_for_this_user
-
-# services - TODO: is this required ?
-services:
-- name: some_service
-
-# users to be created in vault for userpass auth method
-users:
-
-# policies in vault:
-# https://www.vaultproject.io/intro/getting-started/policies.html
-# https://www.vaultproject.io/docs/concepts/policies.html
-# https://www.vaultproject.io/guides/configuration/policies.html
-
-# NOTE: regular users will be assigned a policy
-# at runtime that has the same name as the user
-
-- name: kr1sp1n
-  policies:
-  - default
-
-- name: shorty
-  policies:
-  - default
-
-- name: ssc
-  policies:
-  - default
-
-- name: test
-  policies:
-  - default
 
 # https://www.vaultproject.io/api/system/init.html#parameters
 

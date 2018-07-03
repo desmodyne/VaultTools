@@ -82,6 +82,19 @@ fi
 # -----------------------------------------------------------------------------
 # set up userpass authentication
 
+
+if [ "${users_json}" = 'null' ]
+then
+    echo 'no users configured; skip setting up userpass authentication'
+    echo
+    echo 'HashiCorp Vault UserPass authentication setup complete'
+    echo
+    exit
+else
+    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+fi
+
+
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 echo -n 'log into vault: '
@@ -166,11 +179,6 @@ else
     fi
 fi
 
-
-if [ "${users_json}" != 'null' ]
-then
-    usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
-fi
 
 for username in ${usernames}
 do

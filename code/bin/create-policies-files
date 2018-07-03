@@ -93,6 +93,8 @@ if ! validate_secure_location;      then exit 1; fi
 # create policies configuration file
 
 
+# TODO: only do this if any services or users are configured
+
 if ! pushd "${path_to_project_root}" > /dev/null
 then
     echo "failed to pushd to project root ${path_to_project_root}"
@@ -115,8 +117,10 @@ fi
 
 # TODO: continue or exit ?
 
-if [ "${services_json}" != 'null' ]
+if [ "${services_json}" = 'null' ]
 then
+    echo 'no services configured; skip creating service policy files'
+else
     service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
 fi
 
@@ -164,8 +168,10 @@ do
 done
 
 
-if [ "${users_json}" != 'null' ]
+if [ "${users_json}" = 'null' ]
 then
+    echo 'no users configured; skip creating user policy files'
+else
     usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 

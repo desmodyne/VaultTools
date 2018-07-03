@@ -92,6 +92,8 @@ fi
 # -----------------------------------------------------------------------------
 # upload policies
 
+# TODO: only do this if any services or users are configured
+
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 # TODO: this fails, address is ignored
@@ -108,8 +110,10 @@ else
 fi
 
 
-if [ "${services_json}" != 'null' ]
+if [ "${services_json}" = 'null' ]
 then
+    echo 'no services configured; skip uploading service policy files'
+else
     service_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
 fi
 
@@ -140,8 +144,10 @@ do
     echo "  file uploaded: ${path_to_conf_file}"
 done
 
-if [ "${users_json}" != 'null' ]
+if [ "${users_json}" = 'null' ]
 then
+    echo 'no users configured; skip uploading user policy files'
+else
     usernames="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
 fi
 
