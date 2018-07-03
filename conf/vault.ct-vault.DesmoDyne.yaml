@@ -11,19 +11,23 @@
 # vault server protocol, host and port
 vault_address: http://ct-vault-server:8200
 
-# path to vault log file on its host
+# TODO: do these conf items really belong in here ?
+
+# absolute path in vault server container to vault log file
 # NOTE: this must be in sync with the log folder /vault/logs
 # hardcoded verbatim multiple times in base Dockerfile at
 # https://github.com/hashicorp/docker-vault/blob/master/0.X/Dockerfile
-# TODO: does this conf item really belong in here ?
 path_to_log_file: /vault/logs/audit.log
 
-# absolute path to secure location with master key and root token info
-# TODO: use better location
-path_to_sec_loc: /tmp
+# absolute path in vault client container to secure location
+# with vault master key and root token info - PROTECT THIS!!
+# TODO: this is runtime data, so e.g. /var/lib/vault/secrets ?
+path_to_sec_loc: /opt/vault/secrets
 
-# absolute path to folder with templates
-# TODO: this must be in sync with Docker locations
+# absolute path in vault client container to folder with templates
+# TODO: this is extra data, so e.g. /var/lib/vault/templates ?
+# TODO: this must be in sync with paths assembled from vault_folder in
+# ci-vault-client Dockerfile and files_to_copy paths in build-basic-images conf
 path_to_tmpl_folder: /opt/vault/tmpl
 
 # name of file with keys to unseal vault, relative to path_to_sec_loc

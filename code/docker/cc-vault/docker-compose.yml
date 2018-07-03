@@ -21,10 +21,10 @@ services:
     # .../cicd/bin/build-basic-images - is there a way to integrate this ?
     # build:
     #   context: ../ci-vault-client
-    # keep container running to inspect:
-    # https://stackoverflow.com/a/42873832
+    # keep container running to inspect: https://stackoverflow.com/a/42873832
     # command: tail -f /dev/null
-    command: /opt/vault/bin/build-vault /opt/vault/conf/vault.ct-vault-server.DesmoDyne.yaml
+    # TODO: this must be in sync with loads of settings from other places
+    command: /opt/vault/bin/build-vault /opt/vault/conf/vault.ct-vault.DesmoDyne.yaml
     container_name: ct-vault-client
     image: ci-vault-client
     networks:
