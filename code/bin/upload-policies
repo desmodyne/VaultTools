@@ -38,16 +38,16 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # TODO: review output, message only if error or -v / --verbose
 
 # http://mikefarah.github.io/yq
-config="$(yq r "${config_file}")"
+config="$(yq -j r "${config_file}")"
 
-vault_address="$(   yq r - vault_address    <<< "${config}")"
-path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
-key_file_name="$(   yq r - key_file_name    <<< "${config}")"
-policies_folder="$( yq r - policies_folder  <<< "${config}")"
+vault_address="$(   jq -r '.vault_address'    <<< "${config}")"
+path_to_sec_loc="$( jq -r '.path_to_sec_loc'  <<< "${config}")"
+key_file_name="$(   jq -r '.key_file_name'    <<< "${config}")"
+policies_folder="$( jq -r '.policies_folder'  <<< "${config}")"
 
-# TODO: yq fails to support accessing substructures, so use jq
-services_json="$(   yq -j r - services      <<< "${config}")"
-users_json="$(      yq -j r - users         <<< "${config}")"
+# compound configuration sections
+services_json="$(   jq -r '.services'         <<< "${config}")"
+users_json="$(      jq -r '.users'            <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------

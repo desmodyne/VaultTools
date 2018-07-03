@@ -33,18 +33,18 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # TODO: review output, message only if error or -v / --verbose
 
 # http://mikefarah.github.io/yq
-config="$(yq r "${config_file}")"
-
-path_to_sec_loc="$(    yq r - path_to_sec_loc     <<< "${config}")"
-path_to_tmpl_folder="$(yq r - path_to_tmpl_folder <<< "${config}")"
-users_folder="$(       yq r - users_folder        <<< "${config}")"
-placeholder="$(        yq r - placeholder         <<< "${config}")"
-
-# TODO: yq fails to support accessing substructures, so use jq
 # TODO: this works with yq 1.15.0, but fails with yq 2.x.y;
 # on macOS, use e.g. brew switch yq 1.15.0 to downgrade:
 # https://stackoverflow.com/a/4158763
-users_json="$(yq -j r - users <<< "${config}")"
+config="$(yq -j r "${config_file}")"
+
+path_to_sec_loc="$(    jq -r '.path_to_sec_loc'     <<< "${config}")"
+path_to_tmpl_folder="$(jq -r '.path_to_tmpl_folder' <<< "${config}")"
+users_folder="$(       jq -r '.users_folder'        <<< "${config}")"
+placeholder="$(        jq -r '.placeholder'         <<< "${config}")"
+
+# compound configuration sections
+users_json="$(         jq -r '.users'               <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------

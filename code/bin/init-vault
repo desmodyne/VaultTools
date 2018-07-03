@@ -36,13 +36,14 @@ if ! proc_cmd_line_args "$@";       then exit 1; fi
 # TODO: review output, message only if error or -v / --verbose
 
 # http://mikefarah.github.io/yq
-config="$(yq r "${config_file}")"
+# NOTE: this essentially converts YAML to JSON
+config="$(yq -j r "${config_file}")"
 
-vault_address="$(   yq r - vault_address    <<< "${config}")"
-path_to_sec_loc="$( yq r - path_to_sec_loc  <<< "${config}")"
-key_file_name="$(   yq r - key_file_name    <<< "${config}")"
-secret_shares="$(   yq r - secret_shares    <<< "${config}")"
-secret_threshold="$(yq r - secret_threshold <<< "${config}")"
+vault_address="$(   jq -r '.vault_address'    <<< "${config}")"
+path_to_sec_loc="$( jq -r '.path_to_sec_loc'  <<< "${config}")"
+key_file_name="$(   jq -r '.key_file_name'    <<< "${config}")"
+secret_shares="$(   jq -r '.secret_shares'    <<< "${config}")"
+secret_threshold="$(jq -r '.secret_threshold' <<< "${config}")"
 
 
 # -----------------------------------------------------------------------------
