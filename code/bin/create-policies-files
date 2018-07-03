@@ -40,8 +40,15 @@ path_to_tmpl_folder="$(jq -r '.path_to_tmpl_folder' <<< "${config}")"
 policies_folder="$(    jq -r '.policies_folder'     <<< "${config}")"
 
 # compound configuration sections
-services_json="$(      jq -r '.services'            <<< "${config}")"
-users_json="$(         jq -r '.users'               <<< "${config}")"
+secrets_json="$(       jq -r '.secrets'             <<< "${config}")"
+
+# TODO: review jq exprs to make these scalable beyond one path
+
+# json data structure with secrets for each service
+serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets_json}")"
+
+# json data structure with secrets for each user
+user_secrets="$(jq '.[] | select(.context=="user")'    <<< "${secrets_json}")"
 
 
 # -----------------------------------------------------------------------------
@@ -117,11 +124,11 @@ fi
 
 # TODO: continue or exit ?
 
-if [ "${services_json}" = 'null' ]
+if [ -z "${serv_secrets}" ]
 then
     echo 'no services configured; skip creating service policy files'
 else
-    serv_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+    serv_names="$(jq -r '.sec_confs[].path' <<< "${serv_secrets}" | xargs)"
 fi
 
 for serv_name in ${serv_names}
@@ -168,11 +175,11 @@ do
 done
 
 
-if [ "${users_json}" = 'null' ]
+if [ -z "${user_secrets}" ]
 then
     echo 'no users configured; skip creating user policy files'
 else
-    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+    user_names="$(jq -r '.sec_confs[].path' <<< "${user_secrets}" | xargs)"
 fi
 
 for user_name in ${user_names}

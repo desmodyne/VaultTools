@@ -45,7 +45,12 @@ path_to_sec_loc="$( jq -r '.path_to_sec_loc'  <<< "${config}")"
 key_file_name="$(   jq -r '.key_file_name'    <<< "${config}")"
 
 # compound configuration sections
-services_json="$(   jq -r '.services'         <<< "${config}")"
+secrets_json="$(       jq -r '.secrets'             <<< "${config}")"
+
+# TODO: review jq exprs to make these scalable beyond one path
+
+# json data structure with secrets for each service
+serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets_json}")"
 
 
 # -----------------------------------------------------------------------------
@@ -83,7 +88,7 @@ fi
 # set up approle authentication
 
 
-if [ "${services_json}" = 'null' ]
+if [ -z "${serv_secrets}" ]
 then
     echo 'no services configured; skip setting up approle authentication'
     echo
@@ -91,7 +96,7 @@ then
     echo
     exit
 else
-    serv_names="$(jq -r '.[].name' <<< "${services_json}" | xargs)"
+    serv_names="$(jq -r '.sec_confs[].path' <<< "${serv_secrets}" | xargs)"
 fi
 
 
