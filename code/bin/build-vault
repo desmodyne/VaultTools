@@ -84,6 +84,6 @@ echo 'HashiCorp Vault instance build complete'
 echo
 
 # TODO: remove this once development is complete
-# echo
-# echo 'keep container running for inspection'
-# tail -f /dev/null
+echo
+echo 'Keep container running for inspection'
+tail -f /dev/null
