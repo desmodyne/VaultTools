@@ -11,6 +11,8 @@
 #   docker run --cap-add IPC_LOCK --name ct-vault -p 8200:8200 ci-vault \
 #     vault server -config /vault/config
 
+# TODO: un-expose port 8200 inherited from base container
+
 FROM vault:latest
 MAINTAINER Stefan Schablowski <stefan.schablowski@desmodyne.com>
 
