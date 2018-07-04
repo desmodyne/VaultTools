@@ -1,0 +1,47 @@
+---
+# docker-compose.yml
+#
+# HashiCorp Vault client & server Docker composition
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-07-03
+
+
+# compose file version 2 reference:
+# https://docs.docker.com/compose/compose-file/compose-file-v2
+
+# TODO: refactor hardcoded locations to parameters
+
+version: "2"
+
+services:
+  vault_client:
+    # TODO: supplying build context is pointless, image must be built using
+    # .../cicd/bin/build-basic-images - is there a way to integrate this ?
+    # build:
+    #   context: ../ci-vault-client
+    # keep container running to inspect: https://stackoverflow.com/a/42873832
+    # command: tail -f /dev/null
+    # TODO: this must be in sync with loads of settings from other places
+    command: /opt/vault/bin/build-vault /opt/vault/conf/vault.ct-vault.DesmoDyne.yaml
+    container_name: ct-vault-client
+    image: ci-vault-client
+    networks:
+      - vault_net
+
+  vault_server:
+    build:
+      context: ../ci-vault-server
+    cap_add: [ IPC_LOCK ]
+    command: vault server -config /vault/config
+    container_name: ct-vault-server
+    image: ci-vault-server
+    ports:
+      - "8200:8200"
+    networks:
+      - vault_net
+
+networks:
+  vault_net:
+    driver: bridge

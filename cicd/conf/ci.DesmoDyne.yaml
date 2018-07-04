@@ -11,8 +11,8 @@
 # list of data sets to configure basic container images
 basic_images:
 
-  # name of the container image; for every image, a Dockerfile is expected in
-  # the image build folder .../Infrastructure/Docker/code/docker/<image name>/
+  # name of the container image; for every image, a Dockerfile
+  # is expected in the image build folder ...code/docker/<image name>/
   ci-vault-client:
     # list of files to copy into the image build folder prior to building
     # the image; will be deleted once the image was built successfully
@@ -21,4 +21,9 @@ basic_images:
     - conf
     - data/tmpl
     # container image tag
+    image_tag: latest
+
+  ci-vault-server:
+    files_to_copy:
+    - data/mirror/ci-vault-server/vault/config/vault.hcl
     image_tag: latest
