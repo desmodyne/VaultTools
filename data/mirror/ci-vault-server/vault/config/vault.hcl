@@ -21,3 +21,7 @@ listener "tcp" {
   address     = "0.0.0.0:8200"
   tls_disable = 1
 }
+
+# activate built-in management UI
+# https://www.vaultproject.io/docs/configuration/ui/index.html
+ui = true

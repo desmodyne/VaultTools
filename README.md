@@ -25,8 +25,8 @@ hostname:test_vault username$ git clone https://gitlab.com/DesmoDyne/Tools/Vault
 ### Run Docker container composition
 
 ```
-hostname:test_vault username$ cd vault/code/docker/cc-vault
-hostname:cc-vault username$ docker-compose up
+hostname:test_vault username$ cd vault/code/docker/cc-vault_docker_hub
+hostname:cc-vault_docker_hub username$ docker-compose up
   ...
 ```
 
@@ -139,6 +139,17 @@ bash-4.4# cat /opt/vault/secrets/secrets/some_service.yaml
     yet_another_secret: TODO
 ```
 
+### Inspect management UI
+
++ open <http://127.0.0.1:8200/ui> in a web browser:
+
+![Screenshot Chrome Vault Login!](doc/img/20180704-165144+0200 Screenshot Chrome Vault Login.png)
+
++ copy the `root_token` value from `/opt/vault/secrets/init.json` above
++ paste it into the Vault _Token_ login tab to log in
+
+**WARNING: In a real-world use case, you should use the root token only when there is no other way to log in!**
+
 ### Clean up
 
 + in second shell / Terminal session:
@@ -150,9 +161,9 @@ bash-4.4# cat /opt/vault/secrets/secrets/some_service.yaml
 + clean up container composition resources and local test repository
 
 ```
-hostname:cc-vault username$ docker-compose down
+hostname:cc-vault_docker_hub username$ docker-compose down
   ...
-hostname:cc-vault username$ cd
+hostname:cc-vault_docker_hub username$ cd
 hostname:~ username$ rm -fr ~/Temp/test_vault
 ```
 
