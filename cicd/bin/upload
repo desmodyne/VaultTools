@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+# upload
+#
+# upload all artifacts of this project
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2017-05-26
+
+
+# this script uploads a number of Docker container images to a registry
+
+
+# TODO: see also build script
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+# NOTE: running this on Linux as a non-privileged user
+# requires adding that user to the docker group
+
+case "${OSTYPE}" in
+    darwin*)
+        ;;
+    linux-*)
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit 1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
+# path to script configuration file, relative to project root
+path_to_conf_file='cicd/conf/ci.DesmoDyne.yaml'
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# NOTE: see config file for parameter documentation
+# TODO: error handling, e.g. check if json / yaml keys are available
+
+# http://mikefarah.github.io/yq
+config="$(yq r "${path_to_conf_file}")"
+
+cont_namespace="$( yq r - cont_namespace <<< "${config}")"
+
+# NOTE: the first line essentially converts YAML to JSON,
+# the second line extracts basic and complex image configuration
+cont_image_data="$(yq r -j - <<< "${config}" \
+                     | jq '.basic_images + .complex_images')"
+
+
+# -----------------------------------------------------------------------------
+# upload project artifacts
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "Failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
+
+# https://unix.stackexchange.com/a/76407
+if ! image_names="$(jq -r ". | keys[]" <<< "${cont_image_data}")"
+then
+    exit 1
+fi
+
+
+for image_name in ${image_names}
+do
+    # TODO: this should create any repositories that don't exist already,
+    # but Docker Hub / Store / Cloud / docker.io / whatever does not seem
+    # to provide a REST API that actually exists; didn't get anywhere with
+    # https://docs.docker.com/apidocs/docker-cloud/
+
+    echo "container image name: ${image_name}"
+    echo
+
+    if ! public_name="$(jq -r ".\"${image_name}\".public_name" \
+             <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if ! tag="$(jq -r ".\"${image_name}\".image_tag" <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    # TODO: introduce image versioning
+    repo_tag="${cont_namespace}/${public_name}:${tag}"
+
+    echo -n 'Tag Docker container image with repository info: '
+    if output="$(docker tag "${image_name}:${tag}" "${repo_tag}" 2>&1)"
+    then
+        echo 'OK'
+        echo
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+
+
+    # NOTE: docker push displays its own output
+    # TODO: using official url here fails with
+    #   Get https://registry.desmodyne.com/v2/: x509: certificate is valid for
+    #     *.dkr.ecr.eu-central-1.amazonaws.com, not registry.desmodyne.com
+    echo 'Push Docker container image to repository:'
+    if ! docker push "${repo_tag}"
+    then
+        exit 1
+    fi
+
+    # NOTE: docker push displays its own output
+    echo
+    echo 'Remove repository info tag from Docker container:'
+    if ! docker rmi "${repo_tag}"
+    then
+        exit 1
+    fi
+
+
+    echo
+    echo "container image ${image_name} upload complete"
+    echo
+done
+
+
+if ! popd > /dev/null
+then
+    echo "Failed to popd from project root ${path_to_project_root}"
+    exit
+fi

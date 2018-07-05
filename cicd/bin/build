@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+# build
+#
+# build all artifacts of this project
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2017-05-26
+
+
+# this script builds a number of Docker container images
+
+
+echo
+echo 'build Docker container images'
+echo
+
+
+# -----------------------------------------------------------------------------
+# determine platform: http://stackoverflow.com/a/18434831
+
+case "${OSTYPE}" in
+    darwin*)
+        ;;
+    linux-*)
+        ;;
+    *)
+        echo "Unsupported operating system: ${OSTYPE}"
+        exit 1
+        ;;
+esac
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
+# path to script configuration file, relative to project root
+path_to_conf_file='cicd/conf/ci.DesmoDyne.yaml'
+
+# alphabetical list of tools called by this script
+req_tools='build-basic-images'
+
+
+# -----------------------------------------------------------------------------
+# determine path to related scripts
+
+# In production, all related scripts are installed  using a distribution package
+# and any (related or other, e.g. Linux system) tools are found in PATH;
+# during development, this is not necessarily the case: Test if all tools are
+# found and if one is missing, append the path this script resides in to PATH
+# and retry. This does not mix package / production and development versions,
+# either all related scripts are taken from PATH or all are taken from local.
+
+# TODO: align output
+
+amended_path=false
+
+echo 'determine path to sub scripts:'
+
+for req_tool in ${req_tools}
+do
+    echo -n "  ${req_tool}: "
+    if [ -n "$(which "${req_tool}")" ]
+    then
+        echo 'OK'
+    else
+        echo 'No such file or directory'
+        PATH="${path_to_this_script}:${PATH}"
+        amended_path=true
+        break
+    fi
+done
+
+if [ "${amended_path}" = true ]
+then
+    echo 'amend PATH and retry:'
+    for req_tool in ${req_tools}
+    do
+        echo -n "  ${req_tool}: "
+        if [ -n "$(which "${req_tool}")" ]
+        then
+            echo 'OK'
+        else
+            echo 'No such file or directory'
+            exit 1
+        fi
+    done
+fi
+
+echo
+
+
+# -----------------------------------------------------------------------------
+# call the other scripts in the designated order
+
+# TODO: review error handling (use trap with error function ?)
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
+if ! build-basic-images "${path_to_conf_file}"; then exit 1; fi
+
+if ! popd > /dev/null
+then
+    echo "failed to popd from project root ${path_to_project_root}"
+    exit
+fi
+
+echo 'Docker container images build complete'
+echo
