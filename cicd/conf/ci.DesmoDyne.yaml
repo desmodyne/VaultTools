@@ -8,6 +8,10 @@
 # created : 2018-05-29
 
 
+# container namespace
+cont_namespace: desmodyne
+
+
 # list of data sets to configure basic container images
 basic_images:
 
@@ -22,8 +26,11 @@ basic_images:
     - data/tmpl
     # container image tag
     image_tag: latest
+    # container image name at public repository, e.g. docker.io
+    public_name: vault-client
 
   ci-vault-server:
     files_to_copy:
     - data/mirror/ci-vault-server/vault/config/vault.hcl
     image_tag: latest
+    public_name: vault-server
