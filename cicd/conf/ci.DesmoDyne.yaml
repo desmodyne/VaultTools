@@ -21,7 +21,7 @@ basic_images:
     # list of files to copy into the image build folder prior to building
     # the image; will be deleted once the image was built successfully
     files_to_copy:
-    - code/bin
+    - code/vault
     - conf
     - data/tmpl
     # container image tag
