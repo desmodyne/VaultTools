@@ -17,14 +17,13 @@ version: "2"
 
 services:
   vault_client:
-    # TODO: supplying build context is pointless, image must be built using
-    # .../cicd/bin/build-basic-images - is there a way to integrate this ?
-    # build:
-    #   context: ../ci-vault-client
+    build:
+      context: ../../..
+      dockerfile: code/docker/ci-vault-client/Dockerfile
     # keep container running to inspect: https://stackoverflow.com/a/42873832
     # command: tail -f /dev/null
     # TODO: this must be in sync with loads of settings from other places
-    command: /opt/vault/bin/build-vault /opt/vault/conf/vault/ct-vault.DesmoDyne.yaml
+    command: /opt/vault/bin/build-vault /opt/vault/conf/ct-vault.DesmoDyne.yaml
     container_name: ct-vault-client
     image: ci-vault-client
     networks:
@@ -32,7 +31,8 @@ services:
 
   vault_server:
     build:
-      context: ../ci-vault-server
+      context: ../../..
+      dockerfile: code/docker/ci-vault-server/Dockerfile
     cap_add: [ IPC_LOCK ]
     command: vault server -config /vault/config
     container_name: ct-vault-server

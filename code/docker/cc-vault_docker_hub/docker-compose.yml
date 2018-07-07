@@ -24,7 +24,7 @@ services:
     # keep container running to inspect: https://stackoverflow.com/a/42873832
     # command: tail -f /dev/null
     # TODO: this must be in sync with loads of settings from other places
-    command: /opt/vault/bin/build-vault /opt/vault/conf/vault/ct-vault.DesmoDyne.yaml
+    command: /opt/vault/bin/build-vault /opt/vault/conf/ct-vault.DesmoDyne.yaml
     container_name: ct-vault-client
     image: desmodyne/vault-client
     networks:

@@ -33,9 +33,6 @@ ENV vault_folder=/opt/vault
 
 RUN mkdir -p "${vault_folder}"
 
-# NOTE: Docker does not support relative paths, using e.g. ../bin fails with
-#   COPY failed: Forbidden path outside the build context: ../bin ()
-# therefore, this image must be built using .../cicd/bin/build-basic-images
-COPY vault "${vault_folder}/bin"
-COPY conf  "${vault_folder}/conf"
-COPY tmpl  "${vault_folder}/tmpl"
+COPY code/vault "${vault_folder}/bin"
+COPY conf/vault "${vault_folder}/conf"
+COPY data/tmpl  "${vault_folder}/tmpl"
