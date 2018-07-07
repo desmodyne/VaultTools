@@ -1,5 +1,5 @@
 ---
-# vault.<id>.<organization>.yaml
+# <id>.<organization>.yaml
 #
 # <organization> / <id> YAML configuration file for HashiCorp vault scripts
 #
