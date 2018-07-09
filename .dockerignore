@@ -1,0 +1,29 @@
+# .dockerignore
+#
+# file patterns excluded from Docker build context
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-07-07
+
+
+# https://docs.docker.com/engine/reference/builder/#dockerignore-file
+# https://docs.docker.com/engine/reference/commandline/build/#text-files
+
+# TODO: must .dockerignore be listed here ?
+# TODO: ideal .dockerignore file differs between containers:
+# data/mirror for ci-vault-client, data/tmpl for ci-vault-server
+
+.DS_Store
+.dockerignore
+.git
+.gitignore
+README.md
+cicd
+code/docker
+code/secrets
+conf/secrets
+doc
+logo.png
+project.conf
+tmp

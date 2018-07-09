@@ -18,19 +18,14 @@ basic_images:
   # name of the container image; for every image, a Dockerfile
   # is expected in the image build folder ...code/docker/<image name>/
   ci-vault-client:
-    # list of files to copy into the image build folder prior to building
-    # the image; will be deleted once the image was built successfully
-    files_to_copy:
-    - code/vault
-    - conf
-    - data/tmpl
+    # path to Dockerfile, relative to project root
+    path_to_dockerfile: code/docker/ci-vault-client/Dockerfile
     # container image tag
     image_tag: latest
     # container image name at public repository, e.g. docker.io
     public_name: vault-client
 
   ci-vault-server:
-    files_to_copy:
-    - data/mirror/ci-vault-server/vault/config/vault.hcl
+    path_to_dockerfile: code/docker/ci-vault-server/Dockerfile
     image_tag: latest
     public_name: vault-server

@@ -25,4 +25,4 @@ MAINTAINER Stefan Schablowski <stefan.schablowski@desmodyne.com>
 ENV conf_folder=/vault/config
 
 # copy configuration file
-COPY vault.hcl "${conf_folder}/vault.hcl"
+COPY data/mirror/ci-vault-server/vault/config/vault.hcl "${conf_folder}/vault.hcl"

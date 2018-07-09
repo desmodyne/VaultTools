@@ -194,28 +194,25 @@ do
     echo "container image name: ${image_name}"
     echo
 
-    image_path="${path_to_docker_folder}/${image_name}"
-
-    if [ ! -f "${image_path}/Dockerfile" ]
+    if ! path_to_dockerfile="$(jq -r ".\"${image_name}\".path_to_dockerfile" \
+          <<< "${cont_image_data}")"
     then
-        echo 'Failed to find Dockerfile at'
-        echo "  $(realpath "${image_path}")"
         exit 1
     fi
 
-    echo "build ${image_name} at"
-    echo "  $(realpath "${image_path}"):"
+    if [ ! -f "${path_to_dockerfile}" ]
+    then
+        echo 'Failed to find Dockerfile at'
+        echo "  $(realpath "${path_to_dockerfile}")"
+        exit 1
+    fi
+
+    echo "build ${image_name} with"
+    echo "  $(realpath "${path_to_dockerfile}"):"
     echo
 
     # TODO: continue or exit ?
     # TODO: review error handling / output / exit code
-
-    # https://unix.stackexchange.com/a/76407
-    if ! files_to_copy="$(jq -r ".\"${image_name}\".files_to_copy[]" \
-             <<< "${cont_image_data}")"
-    then
-        exit 1
-    fi
 
     if ! tag="$(jq -r ".\"${image_name}\".image_tag" <<< "${cont_image_data}")"
     then
@@ -227,33 +224,6 @@ do
     then
         exit 1
     fi
-
-    orig_IFS="${IFS}"
-    IFS=$'\n'
-
-    files_to_delete=''
-
-    # TODO: do this in a single command
-    for file_to_copy in ${files_to_copy}
-    do
-        if [ -d "${file_to_copy}" ]
-        then
-            if ! cp -a "${file_to_copy}" "${image_path}/"
-            then
-                exit 1
-            fi
-        else
-            if ! cp "${file_to_copy}" "${image_path}/"
-            then
-                exit 1
-            fi
-        fi
-
-        # TODO: this fails with space in folder / filename
-        files_to_delete+="${image_path}/$(basename "${file_to_copy}") "
-    done
-
-    IFS="${orig_IFS}"
 
     if [ "${vault_auth_path}" != 'null' ]
     then
@@ -298,6 +268,8 @@ do
             exit 1
         fi
 
+        # TODO: fix this
+
         if output="$(printf "${secrets_file_tmpl}" \
                             "${role_id}" "${secret_id}" 2>&1)"
         then
@@ -308,7 +280,8 @@ do
         fi
     fi
 
-    if ! docker build --tag "${image_name}:${tag}" "${image_path}"
+    if ! docker build --file "${path_to_dockerfile}" \
+                      --tag "${image_name}:${tag}" . 
     then
         exit 1
     fi
@@ -317,24 +290,6 @@ do
     then
         rm "${image_path}/${path_to_secrets_file}"
     fi
-
-    # TODO: do this in a single command
-    for file_to_delete in ${files_to_delete}
-    do
-        if [ -d "${file_to_delete}" ]
-        then
-            # https://github.com/koalaman/shellcheck/wiki/SC2115
-            if ! rm -r "${file_to_delete}"
-            then
-                exit 1
-            fi
-        else
-            if ! rm "${file_to_delete}"
-            then
-                exit 1
-            fi
-        fi
-    done
 
     echo
     echo "container image ${image_name} complete"
