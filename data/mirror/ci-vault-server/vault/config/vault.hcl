@@ -25,3 +25,9 @@ listener "tcp" {
 # activate built-in management UI
 # https://www.vaultproject.io/docs/configuration/ui/index.html
 ui = true
+
+# https://www.vaultproject.io/docs/configuration/index.html#disable_mlock
+# required as vault daemon does not run as root and does not have sufficient
+# privileges to perform an mlock system call; most cloud platforms (such as
+# AWS or Sloppy) don't have any swap space, so it is safe to set this
+disable_mlock = true
