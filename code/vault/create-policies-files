@@ -137,7 +137,7 @@ do
 
     path_to_conf_file="${path_to_policies_folder}/${serv_name}.hcl"
 
-    echo -n '  render template data template: '
+    echo -n '  render service policy template data template: '
     # j2 --format env requires export
     export serv_name="${serv_name}"
     if output="$(j2 --format env \
@@ -152,7 +152,7 @@ do
     fi
     export serv_name=
 
-    echo -n '  create policies configuration file: '
+    echo -n '  render service policy template: '
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -164,7 +164,18 @@ do
                      <<< "${policy_tmpl_data}" 2>&1)"
     then
         echo 'OK'
-        echo "${output}" > "${path_to_conf_file}"
+        policy_conf="${output}"
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+
+    echo -n '  create service policy configuration file: '
+
+    if output="$(echo "${policy_conf}" 2>&1 > "${path_to_conf_file}")"
+    then
+        echo 'OK'
     else
         echo 'ERROR'
         echo "  ${output}"
@@ -188,8 +199,7 @@ do
 
     path_to_conf_file="${path_to_policies_folder}/${user_name}.hcl"
 
-    echo -n '  render template data template: '
-    # j2 --format env requires export
+    echo -n '  render user policy template data template: '
     export user_name="${user_name}"
     if output="$(j2 --format env \
                      "${path_to_tmpl_folder}/${user_tmpl_data_tmpl_name}" 2>&1)"
@@ -203,7 +213,7 @@ do
     fi
     export user_name=
 
-    echo -n '  create policies configuration file: '
+    echo -n '  render user policy template: '
 
     # TODO: req'd for defunct curl call
     # render request data template
@@ -215,7 +225,18 @@ do
                      <<< "${policy_tmpl_data}" 2>&1)"
     then
         echo 'OK'
-        echo "${output}" > "${path_to_conf_file}"
+        policy_conf="${output}"
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+
+    echo -n '  create user policy configuration file: '
+
+    if output="$(echo "${policy_conf}" 2>&1 > "${path_to_conf_file}")"
+    then
+        echo 'OK'
     else
         echo 'ERROR'
         echo "  ${output}"
