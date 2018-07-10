@@ -30,8 +30,15 @@ req_tools+='upload-policies upload-secrets'
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
-# TODO: review path to library
-source /opt/vault/bin/vault.lib
+# TODO: review this
+# TODO: also do this wherever else vault.lib is sourced (?)
+if   [ -e vault.lib ]
+then
+    source vault.lib
+elif [ -e /opt/vault/bin/vault.lib ]
+then
+    source /opt/vault/bin/vault.lib
+fi
 
 if ! determine_platform;            then exit 1; fi
 # pass all arguments to this script
