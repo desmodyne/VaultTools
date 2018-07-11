@@ -53,6 +53,16 @@ if ! validate_config_settings;      then exit 1; fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
 # TODO: use template file instead of code ?
 # template for http call json data
 read -r -d '' json_data_tmpl <<'EOT'
@@ -95,6 +105,14 @@ fi
 
 # -----------------------------------------------------------------------------
 # init vault
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
 
 if [ ! -d "${path_to_sec_loc}" ]
 then
@@ -154,6 +172,13 @@ else
     echo 'ERROR'
     echo "${output}"
     exit 1
+fi
+
+
+if ! popd > /dev/null
+then
+    echo "failed to popd from project root ${path_to_project_root}"
+    exit
 fi
 
 
