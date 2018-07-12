@@ -85,11 +85,13 @@ function determine_platform
     case "${OSTYPE}" in
         darwin*)
             echo 'OK'
+            grep='ggrep'
             sed='gsed'
             xargs='gxargs'
             ;;
         linux-*)
             echo 'OK'
+            grep='grep'
             sed='sed'
             xargs='xargs'
             ;;

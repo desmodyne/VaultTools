@@ -64,6 +64,16 @@ if ! validate_config_settings;      then exit 1; fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
 # TODO: req'd for defunct curl call
 # policy request data template
 # read -r -d '' policy_req_data_tmpl <<'EOT'
@@ -100,6 +110,14 @@ fi
 # upload policies
 
 # TODO: only do this if any services or users are configured
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
@@ -237,6 +255,13 @@ do
 
     echo "  file uploaded: ${path_to_conf_file}"
 done
+
+
+if ! popd > /dev/null
+then
+    echo "failed to popd from project root ${path_to_project_root}"
+    exit
+fi
 
 
 echo

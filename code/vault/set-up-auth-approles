@@ -60,8 +60,45 @@ if ! validate_config_settings;      then exit 1; fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+# NOTE: service name must not contain any paths; in fact, the range of
+# allowed characters is heavily restricted; for details, see output of
+#   vault path-help [-address <address>] auth/approle
+#     ...
+#   ^role/(?P<role_name>\w(([\w-.]+)?\w)?)$
+#   Register an role with the backend.
+#     ...
+#
+# Go regex is massively different from GNU grep regex:
+#   https://golang.org/pkg/regexp/syntax
+#   https://www.gnu.org/software/findutils/manual/ ...
+#    ... html_node/find_html/grep-regular-expression-syntax.html
+#   https://www.gnu.org/software/grep/manual/ ...
+#    ... html_node/Character-Classes-and-Bracket-Expressions.html
+# for example, in Go, \w matches word characters [0-9A-Za-z_],
+# in GNU grep, \w matches a character within a word
+#
+# GNU regex corresponding to Go Regex from path-help output above
+service_name_regex='^[0-9A-Za-z_][0-9A-Za-z_.]*[0-9A-Za-z_]$'
+
+# sed -E -e statements applied to recover from invalid service names
+read -r -d '' recover_cmds <<'EOT'
+s|^[^0-9A-Za-z_]|_|g
+s|[^0-9A-Za-z_]$|_|g
+s|[^0-9A-Za-z_.]|_|g
+EOT
 
 
 # -----------------------------------------------------------------------------
@@ -86,6 +123,13 @@ fi
 
 # -----------------------------------------------------------------------------
 # set up approle authentication
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
 
 
 if [ -z "${serv_secrets}" ]
@@ -163,20 +207,68 @@ for serv_name in ${serv_names}
 do
     echo "service ${serv_name}: "
 
+    echo -n "  verify service name ${serv_name}: "
+
+    policy_name="${serv_name}"
+
+    if "${grep}" -q "${service_name_regex}" <<< "${serv_name}"
+    then
+        echo 'OK'
+
+    else
+        echo 'FAIL'
+
+        echo '  attempt to modify service name:'
+        mod_name="${serv_name}"
+        rec_success=false
+
+        for recover_cmd in ${recover_cmds}
+        do
+            mod_name="$("${sed}" -E -e "${recover_cmd}" <<< "${mod_name}")"
+
+            # no point in re-testing unchanged name
+            if [ "${mod_name}" = "${serv_name}" ]
+            then
+                continue
+            fi
+
+            echo -n "    verify modified service name ${mod_name}: "
+            if "${grep}" -q "${service_name_regex}" <<< "${mod_name}"
+            then
+                echo 'OK'
+                rec_success=true
+                break
+            else
+                echo 'FAIL'
+            fi
+        done
+
+        if [ "${rec_success}" = true ]
+        then
+            serv_name="${mod_name}"
+        else
+            echo 'failed to modify invalid service name'
+            continue
+        fi
+    fi
+
     echo -n "  add approle role: "
 
+    full_url="${vault_address}/v1/auth/approle/role/${serv_name}"
+
     # TODO: test if user exists and output 'overwriting' message
-    if output="$(curl --data "{\"policies\": \"${serv_name}\"}"  \
+    if output="$(curl --data "{\"policies\": \"${policy_name}\"}"   \
                       --header "X-Vault-Token: ${root_token}"       \
                       --request POST                                \
                       --show-error                                  \
                       --silent                                      \
-                  "${vault_address}/v1/auth/approle/role/${serv_name}" 2>&1)"
+                      "${full_url}" 2>&1)"
     then
         # if successful, curl returns 0 and output is empty
         if [ -z "${output}" ]
         then
             echo 'OK'
+            echo "  role created: ${full_url}"
         else
             echo 'ERROR'
             # sample output:
@@ -195,6 +287,13 @@ do
         exit 1
     fi
 done
+
+
+if ! popd > /dev/null
+then
+    echo "failed to popd from project root ${path_to_project_root}"
+    exit
+fi
 
 
 echo

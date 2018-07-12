@@ -55,6 +55,16 @@ if ! validate_config_settings;      then exit 1; fi
 # -----------------------------------------------------------------------------
 # configure script parameters
 
+# absolute path to this script: http://stackoverflow.com/a/9107028
+path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+rel_path_to_project_root='../..'
+
+# absolute path to project root
+path_to_project_root="$(realpath \
+                        "${path_to_this_script}/${rel_path_to_project_root}")"
+
 # full path to file with key and token info
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
@@ -84,6 +94,14 @@ fi
 
 # -----------------------------------------------------------------------------
 # unseal vault
+
+
+if ! pushd "${path_to_project_root}" > /dev/null
+then
+    echo "failed to pushd to project root ${path_to_project_root}"
+    exit
+fi
+
 
 echo 'unseal vault:'
 
@@ -149,6 +167,13 @@ if [ "${sealed}" = 'true' ]
 then
     echo 'failed to unsealed vault'
     exit 1
+fi
+
+
+if ! popd > /dev/null
+then
+    echo "failed to popd from project root ${path_to_project_root}"
+    exit
 fi
 
 
