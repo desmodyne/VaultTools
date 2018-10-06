@@ -10,11 +10,16 @@
 
 
 # NOTE: on OS X, install required packages using e.g.
-#   brew install bash coreutils jq yq
-# http://brew.sh/
-# http://apple.stackexchange.com/a/69332
+#   brew install bash coreutils jq vault yq
+#   brew cask install docker
+# https://brew.sh/
+# https://apple.stackexchange.com/a/69332
 # https://stedolan.github.io/jq
-# http://mikefarah.github.io/yq
+# https://www.vaultproject.io/
+# https://mikefarah.github.io/yq
+# https://docs.docker.com/docker-for-mac/install
+# https://www.docker.com/products/docker-desktop
+
 
 # TODO: error handling around using jq and assuming paths being available
 # TODO: review / align script log output, especially during error handling
@@ -28,26 +33,24 @@ echo
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# NOTE: this script is meant to called standalone as well as
-# build subscript, so these variables are possibly already set:
-# http://wiki.bash-hackers.org/syntax/pe#use_a_default_value
-# TODO: the above is probably not true
+# NOTE: I would have thought that these variables are already defined if this
+# script is called as a subscript by build; that does not seem to be the case
 
 # path from this script to project root
-path_to_proj_root="${path_to_proj_root:-../..}"
+path_to_proj_root='../..'
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
-here="${here:-"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"}"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # absolute, canonical path to project root
 # NOTE: realpath fails if path does not exist
 path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
 
 # path to BashLib library file, relative to project root
-path_to_bashlib="${path_to_bashlib:-ext/BashLib/code/lib/bashlib.sh}"
+path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
 
 # absolute path to library
-path_to_library="${path_to_library:-"${path_to_proj_root}/${path_to_bashlib}"}"
+path_to_library="${path_to_proj_root}/${path_to_bashlib}"
 
 # TODO: shellcheck reports these to be unused
 # https://github.com/koalaman/shellcheck/wiki/SC2034
@@ -55,7 +58,7 @@ path_to_library="${path_to_library:-"${path_to_proj_root}/${path_to_bashlib}"}"
 # array with alphabetical list of tools called by this script
 # NOTE: too late to test for realpath, already used above
 # shellcheck disable=SC2034
-req_tools=('jq' 'yq')
+req_tools=('docker' 'jq' 'vault' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -76,27 +79,22 @@ path_to_secrets_file='secrets'
 # -----------------------------------------------------------------------------
 # load BashLib
 
-# TODO: I just assumed BashLib would already be available here if this script
-# is called as subscript to build, as build sources it; this is not the case...
-# TODO: global flag in BashLib to test if library was already sourced ?
+# NOTE: I just assumed BashLib would already be available here if this script
+# is called as subscript to build, as build sources it, but this is not true
 
-# https://stackoverflow.com/a/85903
-if [ -z "$(type -t configure_platform)" ]
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if ! output="$(source "${path_to_library}" 2>&1)"
 then
-    # NOTE: this only tests if library can be sourced;
-    # functions are only defined in "$(...)" subshell,
-    # so a second source for use in here is required
-    # https://github.com/koalaman/shellcheck/wiki/SC1090
-    # shellcheck disable=SC1090
-    if ! output="$(source "${path_to_library}" 2>&1)"
-    then
-        echo "${output}"
-        exit 1
-    fi
-
-    # shellcheck disable=SC1090
-    source "${path_to_library}"
+    echo "${output}"
+    exit 1
 fi
+
+# shellcheck disable=SC1090
+source "${path_to_library}"
 
 
 # -----------------------------------------------------------------------------
@@ -121,6 +119,7 @@ if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
 # shellcheck disable=SC2154
 conf="$(yq r -j "${conf_file}")"
 
+# https://unix.stackexchange.com/a/76407
 cont_image_data="$(jq -r '.basic_images' <<< "${conf}")"
 vault_addr="$(     jq -r '.vault_addr'   <<< "${conf}")"
 
@@ -138,13 +137,17 @@ fi
 
 echo
 
-image_names="$(jq -r 'keys[]' <<< "${cont_image_data}" | sort)"
+if ! image_names="$(jq -r 'keys[]' <<< "${cont_image_data}" | sort)"
+then
+    exit 1
+fi
 
 for image_name in ${image_names}
 do
     echo "container image name: ${image_name}"
     echo
 
+    # NOTE: image name might contain dashes, so need escaped quotes
     if ! path_to_dockerfile="$(jq -r ".\"${image_name}\".path_to_dockerfile" \
           <<< "${cont_image_data}")"
     then
