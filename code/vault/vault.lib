@@ -122,14 +122,20 @@ function get_vault_status
 
     # sample output for uninitialized vault:
     #   alexa:~ ssc$ vault status
-    #   Error checking seal status: Error making API request.
-    #
-    #   URL: GET https://vault.desmodyne.com/v1/sys/seal-status
-    #   Code: 400. Errors:
-    #
-    #   * server is not yet initialized
+    #   {
+    #     "type": "shamir",
+    #     "initialized": false,
+    #     "sealed": true,
+    #     "t": 0,
+    #     "n": 0,
+    #     "progress": 0,
+    #     "nonce": "",
+    #     "version": "",
+    #     "migration": false,
+    #     "recovery_seal": false
+    #   }
 
-    output="$(vault status -address="${vault_address}" 2>&1)"
+    output="$(vault status -address="${vault_address}" -format=json 2>&1)"
     res=$?
 
     case "${res}" in
@@ -138,26 +144,28 @@ function get_vault_status
             return 0
             ;;
 
-        1)  # output contains control characters
-            # https://unix.stackexchange.com/a/96485
-            # TODO: refactor control characters removal out to function
-            last_line="$(tail -n 1 <<< "${output}" \
-                | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
-
-            if [ "${last_line}" = '* server is not yet initialized' ]
-            then
-                echo 'OK'
-                return 3
-            else
-                echo 'ERROR'
-                # TODO: output contains control characters
-                echo "${output}"
-                return 1
-            fi
+        1)  echo 'ERROR'
+            echo "${output}"
+            return 1
             ;;
 
         2)  echo 'OK'
-            return 2
+
+            if output="$(jq '.initialized' <<< "${output}" 2>&1)"
+            then
+                initialized="${output}"
+            else
+                echo 'failed to parse vault status json response:'
+                echo "${output}"
+                return 1
+            fi
+
+            if [ "${initialized}" = true ]
+            then
+                return 2
+            else
+                return 3
+            fi
             ;;
 
         *)  echo 'ERROR'
