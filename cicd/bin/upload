@@ -9,12 +9,11 @@
 # created : 2017-05-26
 
 
-# this script uploads a number of Docker container images to a registry
-# see also build and build-basic-images scripts
+# NOTE: see build script for some possibly informative comments
 
 
 echo
-echo 'upload Docker container images'
+echo 'upload project artifacts'
 echo
 
 
@@ -27,44 +26,42 @@ path_to_proj_root='../..'
 # absolute path to this script: http://stackoverflow.com/a/9107028
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# absolute, canonical path to project root
-# NOTE: realpath fails if path does not exist
-path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
-
 # path to BashLib library file, relative to project root
 path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
 
-# absolute path to library
-path_to_library="${path_to_proj_root}/${path_to_bashlib}"
+# path to Docker scripts, relative to project root
+path_to_docker_bin='../../Infrastructure/Services/Infrastructure/Docker/code/bin'
 
-# TODO: shellcheck reports these to be unused
-# https://github.com/koalaman/shellcheck/wiki/SC2034
+# absolute, canonical path to project root
+path_to_proj_root="$( realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to BashLib library file
+path_to_bashlib="$(   realpath "${path_to_proj_root}/${path_to_bashlib}")"
+
+# absolute, canonical path to Docker scripts
+path_to_docker_bin="$(realpath "${path_to_proj_root}/${path_to_docker_bin}")"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('docker' 'jq' 'yq')
+req_tools=('upload-cont-images-to-gitlab')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
-ext_paths=("${here}")
+ext_paths=("${path_to_docker_bin}")
 
 
 # -----------------------------------------------------------------------------
 # load BashLib
 
-# NOTE: this only tests if library can be sourced;
-# functions are only defined in "$(...)" subshell,
-# so a second source for use in here is required
-# https://github.com/koalaman/shellcheck/wiki/SC1090
 # shellcheck disable=SC1090
-if ! output="$(source "${path_to_library}" 2>&1)"
+if ! output="$(source "${path_to_bashlib}" 2>&1)"
 then
     echo "${output}"
     exit 1
 fi
 
 # shellcheck disable=SC1090
-source "${path_to_library}"
+source "${path_to_bashlib}"
 
 
 # -----------------------------------------------------------------------------
@@ -76,101 +73,11 @@ if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
-# load script configuration
+# call the other scripts in the designated order
 
-# NOTE: see config file for parameter documentation
-# NOTE: this essentially converts YAML to JSON
-# conf_file is defined by proc_cmd_line_args
-# https://github.com/koalaman/shellcheck/wiki/SC2154
 # shellcheck disable=SC2154
-conf="$(yq r -j "${conf_file}")"
-
-cont_image_data="$(jq -r '.basic_images + .complex_images' <<< "${conf}")"
-cont_namespace="$( jq -r '.cont_namespace'                 <<< "${conf}")"
+if ! upload-cont-images-to-gitlab "${conf_file}"; then exit 1; fi
 
 
-# -----------------------------------------------------------------------------
-# upload project artifacts
-
-
-if ! pushd "${path_to_proj_root}" > /dev/null
-then
-    echo "Failed to pushd to project root ${path_to_proj_root}"
-    exit
-fi
-
-
-if ! image_names="$(jq -r 'keys[]' <<< "${cont_image_data}" | sort)"
-then
-    exit 1
-fi
-
-for image_name in ${image_names}
-do
-    # TODO: this should create any repositories that don't exist already,
-    # but Docker Hub / Store / Cloud / docker.io / whatever does not seem
-    # to provide a REST API that actually exists; didn't get anywhere with
-    # https://docs.docker.com/apidocs/docker-cloud/
-
-    echo "container image name: ${image_name}"
-    echo
-
-    if ! public_name="$(jq -r ".\"${image_name}\".public_name" \
-          <<< "${cont_image_data}")"
-    then
-        exit 1
-    fi
-
-    if ! tag="$(jq -r ".\"${image_name}\".image_tag" <<< "${cont_image_data}")"
-    then
-        exit 1
-    fi
-
-    # TODO: introduce image versioning
-    repo_tag="${cont_namespace}/${public_name}:${tag}"
-
-    echo -n 'Tag Docker container image with repository info: '
-    if output="$(docker tag "${image_name}:${tag}" "${repo_tag}" 2>&1)"
-    then
-        echo 'OK'
-        echo
-    else
-        echo 'ERROR'
-        echo "${output}"
-        exit 1
-    fi
-
-
-    # NOTE: docker push displays its own output
-    # TODO: using official url here fails with
-    #   Get https://registry.desmodyne.com/v2/: x509: certificate is valid for
-    #     *.dkr.ecr.eu-central-1.amazonaws.com, not registry.desmodyne.com
-    echo 'Push Docker container image to repository:'
-    if ! docker push "${repo_tag}"
-    then
-        exit 1
-    fi
-
-    # NOTE: docker rmi displays its own output
-    echo
-    echo 'Remove repository info tag from Docker container:'
-    if ! docker rmi "${repo_tag}"
-    then
-        exit 1
-    fi
-
-    echo
-    echo "container image ${image_name} upload complete"
-    echo
-done
-
-
-if ! popd > /dev/null
-then
-    echo "Failed to popd from project root ${path_to_proj_root}"
-    exit
-fi
-
-
-echo 'Docker container images upload complete'
+echo 'project artifacts upload complete'
 echo

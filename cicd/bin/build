@@ -9,16 +9,8 @@
 # created : 2017-05-26
 
 
-# this script builds a number of Docker container images
-
-# NOTE: on OS X, install required packages using e.g.
-#   brew install bash coreutils
-# http://brew.sh/
-# http://apple.stackexchange.com/a/69332
-
-
 echo
-echo 'build Docker container images'
+echo 'build project artifacts'
 echo
 
 
@@ -31,26 +23,34 @@ path_to_proj_root='../..'
 # absolute path to this script: http://stackoverflow.com/a/9107028
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# absolute, canonical path to project root
-# NOTE: realpath fails if path does not exist
-path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
-
 # path to BashLib library file, relative to project root
 path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
 
-# absolute path to library
-path_to_library="${path_to_proj_root}/${path_to_bashlib}"
+# path to Docker scripts, relative to project root
+# TODO: this assumes Infrastructure repo is available at that location
+path_to_docker_bin='../../Infrastructure/Services/Infrastructure/Docker/code/bin'
+
+# NOTE: realpath fails if path does not exist
+
+# absolute, canonical path to project root
+path_to_proj_root="$( realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to BashLib library file
+path_to_bashlib="$(   realpath "${path_to_proj_root}/${path_to_bashlib}")"
+
+# absolute, canonical path to Docker scripts
+path_to_docker_bin="$(realpath "${path_to_proj_root}/${path_to_docker_bin}")"
 
 # TODO: shellcheck reports these to be unused
 # https://github.com/koalaman/shellcheck/wiki/SC2034
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('build-basic-images')
+req_tools=('build-cont-images')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
-ext_paths=("${here}")
+ext_paths=("${path_to_docker_bin}")
 
 
 # -----------------------------------------------------------------------------
@@ -61,23 +61,26 @@ ext_paths=("${here}")
 # so a second source for use in here is required
 # https://github.com/koalaman/shellcheck/wiki/SC1090
 # shellcheck disable=SC1090
-if ! output="$(source "${path_to_library}" 2>&1)"
+if ! output="$(source "${path_to_bashlib}" 2>&1)"
 then
     echo "${output}"
     exit 1
 fi
 
 # shellcheck disable=SC1090
-source "${path_to_library}"
+source "${path_to_bashlib}"
 
 
 # -----------------------------------------------------------------------------
 # run BashLib boilerplate functions
 
-# TODO: ideally, these would be e.g.
+# NOTE: ideally, these function calls would be something like e.g.
 #   if ! output="$(configure_platform 2>&1)"
 #     ...
-# but then, changes to global variables are lost in subshell
+# but on the one hand, they have their own output which should be displayed as
+# it occurs and more importantly, any changes to global variables would only be
+# effective in the subshell created by the braces around the function name and
+# would be lost to this script, effectively rendering the function call useless
 
 if ! configure_platform              ; then exit 1; fi
 if ! extend_path req_tools ext_paths ; then exit 1; fi
@@ -87,25 +90,11 @@ if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
-# TODO: review error handling (use trap with error function ?)
-
-if ! pushd "${path_to_proj_root}" > /dev/null
-then
-    echo "failed to pushd to project root ${path_to_proj_root}"
-    exit
-fi
-
 # conf_file is defined by proc_cmd_line_args
 # https://github.com/koalaman/shellcheck/wiki/SC2154
 # shellcheck disable=SC2154
-if ! build-basic-images "${conf_file}"; then exit 1; fi
-
-if ! popd > /dev/null
-then
-    echo "failed to popd from project root ${path_to_proj_root}"
-    exit
-fi
+if ! build-cont-images "${conf_file}"; then exit 1; fi
 
 
-echo 'Docker container images build complete'
+echo 'project artifacts build complete'
 echo
