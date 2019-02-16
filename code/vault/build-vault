@@ -35,9 +35,9 @@ req_tools+='upload-policies upload-secrets'
 if   [ -e vault.lib ]
 then
     source vault.lib
-elif [ -e /opt/vault/bin/vault.lib ]
+elif [ -e /vault/scripts/vault.lib ]
 then
-    source /opt/vault/bin/vault.lib
+    source /vault/scripts/vault.lib
 fi
 
 if ! determine_platform;            then exit 1; fi

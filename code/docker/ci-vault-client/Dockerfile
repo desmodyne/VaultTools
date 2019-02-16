@@ -30,7 +30,7 @@
 
 # NOTE: once built by CI/CD script, run the container using e.g.
 #   $ docker run --name ct-vault-client desmodyne/ci-vault-client
-#       /opt/vault/bin/build-vault /opt/vault/conf/vault.localhost.yaml
+#       /vault/scripts/build-vault /vault/config/vault.local.yaml
 
 
 # ------------------------------------------------------------------------------
@@ -49,8 +49,20 @@ LABEL maintainer="DesmoDyne Docker Maintainers <docker@desmodyne.com>"
 
 # ARG vs ENV: https://stackoverflow.com/a/41919137
 
+# NOTE: vault folders are defined by base Dockerfile, do not comply with FHS;
+# re-using _server_ folders for _setup client_ files as they are already set up
+
 # vault installation directory
-ENV vault_folder=/opt/vault
+ENV vault_home=/vault
+
+# vault configuration folder
+ENV conf_folder=${vault_home}/config
+
+# vault scripts folder
+ENV scripts_folder=${vault_home}/scripts
+
+# vault templates folder
+ENV tmpl_folder=${vault_home}/tmpl
 
 
 # ------------------------------------------------------------------------------
@@ -66,8 +78,6 @@ RUN apk update && apk add --no-cache bash curl jq python py-pip && \
     chmod a+x /usr/local/bin/yq && \
     pip install --upgrade pip && pip install j2cli
 
-RUN mkdir -p "${vault_folder}"
-
-COPY code/vault "${vault_folder}/bin"
-COPY conf/vault "${vault_folder}/conf"
-COPY data/tmpl  "${vault_folder}/tmpl"
+COPY code/vault "${scripts_folder}"
+COPY conf/vault "${conf_folder}"
+COPY data/tmpl  "${tmpl_folder}"

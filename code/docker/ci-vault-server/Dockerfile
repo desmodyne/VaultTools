@@ -32,14 +32,17 @@ FROM vault:latest
 
 LABEL maintainer="DesmoDyne Docker Maintainers <docker@desmodyne.com>"
 
+# NOTE: vault folders are defined by base Dockerfile, do not comply with FHS
+
+# vault installation directory
+ENV vault_home=/vault
+
 # vault configuration folder
-# NOTE: in theory, this should be e.g. /etc/vault/;
-# in practice, the base Dockerfile doesn't care about FHS
-ENV conf_folder=/vault/config
+ENV conf_folder=${vault_home}/config
 
 
 # ------------------------------------------------------------------------------
 # execution stage / container
 
 # copy configuration file
-COPY data/mirror/ci-vault-server/vault/config/vault.hcl "${conf_folder}/vault.hcl"
+COPY data/mirror/ci-vault-server/vault/config/vault.hcl "${conf_folder}"
