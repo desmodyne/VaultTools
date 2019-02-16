@@ -9,116 +9,92 @@
 # created : 2017-05-26
 
 
-# this script builds a number of Docker container images
-
-
 echo
-echo 'build Docker container images'
+echo 'build project artifacts'
 echo
-
-
-# -----------------------------------------------------------------------------
-# determine platform: http://stackoverflow.com/a/18434831
-
-case "${OSTYPE}" in
-    darwin*)
-        ;;
-    linux-*)
-        ;;
-    *)
-        echo "Unsupported operating system: ${OSTYPE}"
-        exit 1
-        ;;
-esac
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # path from this script to project root
-rel_path_to_project_root='../..'
+path_to_proj_root='../..'
 
-# absolute path to project root
-path_to_project_root="$(realpath \
-                        "${path_to_this_script}/${rel_path_to_project_root}")"
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# path to script configuration file, relative to project root
-path_to_conf_file='cicd/conf/ci.DesmoDyne.yaml'
+# path to BashLib library file, relative to project root
+path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
 
-# alphabetical list of tools called by this script
-req_tools='build-basic-images'
+# path to Docker scripts, relative to project root
+# TODO: this assumes Infrastructure repo is available at that location
+path_to_docker_bin='../../Infrastructure/Services/Infrastructure/Docker/code/bin'
+
+# NOTE: realpath fails if path does not exist
+
+# absolute, canonical path to project root
+path_to_proj_root="$( realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to BashLib library file
+path_to_bashlib="$(   realpath "${path_to_proj_root}/${path_to_bashlib}")"
+
+# absolute, canonical path to Docker scripts
+path_to_docker_bin="$(realpath "${path_to_proj_root}/${path_to_docker_bin}")"
+
+# TODO: shellcheck reports these to be unused
+# https://github.com/koalaman/shellcheck/wiki/SC2034
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('build-cont-images')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${path_to_docker_bin}")
 
 
 # -----------------------------------------------------------------------------
-# determine path to related scripts
+# load BashLib
 
-# In production, all related scripts are installed  using a distribution package
-# and any (related or other, e.g. Linux system) tools are found in PATH;
-# during development, this is not necessarily the case: Test if all tools are
-# found and if one is missing, append the path this script resides in to PATH
-# and retry. This does not mix package / production and development versions,
-# either all related scripts are taken from PATH or all are taken from local.
-
-# TODO: align output
-
-amended_path=false
-
-echo 'determine path to sub scripts:'
-
-for req_tool in ${req_tools}
-do
-    echo -n "  ${req_tool}: "
-    if [ -n "$(which "${req_tool}")" ]
-    then
-        echo 'OK'
-    else
-        echo 'No such file or directory'
-        PATH="${path_to_this_script}:${PATH}"
-        amended_path=true
-        break
-    fi
-done
-
-if [ "${amended_path}" = true ]
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if ! output="$(source "${path_to_bashlib}" 2>&1)"
 then
-    echo 'amend PATH and retry:'
-    for req_tool in ${req_tools}
-    do
-        echo -n "  ${req_tool}: "
-        if [ -n "$(which "${req_tool}")" ]
-        then
-            echo 'OK'
-        else
-            echo 'No such file or directory'
-            exit 1
-        fi
-    done
+    echo "${output}"
+    exit 1
 fi
 
-echo
+# shellcheck disable=SC1090
+source "${path_to_bashlib}"
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+# NOTE: ideally, these function calls would be something like e.g.
+#   if ! output="$(configure_platform 2>&1)"
+#     ...
+# but on the one hand, they have their own output which should be displayed as
+# it occurs and more importantly, any changes to global variables would only be
+# effective in the subshell created by the braces around the function name and
+# would be lost to this script, effectively rendering the function call useless
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
-# TODO: review error handling (use trap with error function ?)
+# conf_file is defined by proc_cmd_line_args
+# https://github.com/koalaman/shellcheck/wiki/SC2154
+# shellcheck disable=SC2154
+if ! build-cont-images "${conf_file}"; then exit 1; fi
 
-if ! pushd "${path_to_project_root}" > /dev/null
-then
-    echo "failed to pushd to project root ${path_to_project_root}"
-    exit
-fi
 
-if ! build-basic-images "${path_to_conf_file}"; then exit 1; fi
-
-if ! popd > /dev/null
-then
-    echo "failed to popd from project root ${path_to_project_root}"
-    exit
-fi
-
-echo 'Docker container images build complete'
+echo 'project artifacts build complete'
 echo

@@ -5,7 +5,7 @@
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2018-02-19
+# created : 2019-02-15
 
 
 # TODO: align with PKI scripts, get these two from Ansible group vars
@@ -17,10 +17,15 @@ mgmt_user_name: ansible
 organization: DesmoDyne
 
 # vault server protocol, host and port
-vault_address: https://vault.desmodyne.com:443
+# https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
+#   "This is for development purpose and will not work in a
+#    production environment outside of Docker Desktop for Mac."
+vault_address: http://host.docker.internal:8200
 
 # path to vault log file on its host
-path_to_log_file: /var/log/vault/audit.log
+# NOTE: this needs to match path set in vault base Dockerfile:
+# https://github.com/hashicorp/docker-vault/blob/master/0.X/Dockerfile
+path_to_log_file: /vault/logs/audit.log
 
 # absolute path to secure location with ssh keys and token info
 path_to_sec_loc: /Volumes/VAULT/Corporate/DesmoDyne/Secrets/vault.desmodyne.com
