@@ -31,7 +31,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'jq' 'j2' 'vault' 'yq')
+req_tools=('jq' 'j2' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034

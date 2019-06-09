@@ -16,6 +16,7 @@
 # TODO: review function names, most of them do more than the name suggests
 # TODO: use named parameters ? https://stackoverflow.com/a/30033822
 # TODO: add code location indicator to log messages ?
+# TODO: how to check if commands used in here are available ?
 
 
 # define functions: http://stackoverflow.com/a/6212408
