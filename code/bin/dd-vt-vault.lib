@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# vault.lib
+# dd-vt-vault.lib
 #
 # functions for HashiCorp Vault shell scripts
 #

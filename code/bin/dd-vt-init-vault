@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# init-vault
+# dd-vt-init-vault
 #
 # initialize a vault and store key and token data in secure location
 #
@@ -22,7 +22,7 @@ echo
 
 # see also build-vault
 
-source vault.lib
+source dd-vt-vault.lib
 
 if ! determine_platform;            then exit 1; fi
 if ! proc_cmd_line_args "$@";       then exit 1; fi

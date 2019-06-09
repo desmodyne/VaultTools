@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# set-up-auth-approles
+# dd-vt-set-up-auth-approles
 #
 # set up AppRole authentication method
 #
@@ -24,7 +24,7 @@ echo
 
 # see also build-vault
 
-source vault.lib
+source dd-vt-vault.lib
 
 if ! determine_platform;            then exit 1; fi
 if ! proc_cmd_line_args "$@";       then exit 1; fi
@@ -158,7 +158,7 @@ fi
 
 # https://www.vaultproject.io/api/system/auth.html
 
-# NOTE: see also set-up-auth-userpass
+# NOTE: see also dd-vt-set-up-auth-userpass
 
 echo -n 'get enabled auth methods: '
 if output="$(vault auth list -address="${vault_address}" 2>&1)"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-vault
+# dd-vt-build-vault
 #
 # initialize and configure a vault instance and add users, policies and secrets
 #
@@ -21,23 +21,23 @@ echo
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # alphabetical list of tools called by this script
-req_tools='configure-vault init-vault unseal-vault '
-req_tools+='create-policies-files create-secrets-files create-users-files '
-req_tools+='set-up-auth-approles set-up-auth-userpass '
-req_tools+='upload-policies upload-secrets'
+req_tools='dd-vt-configure-vault dd-vt-init-vault undd-vt-seal-vault '
+req_tools+='dd-vt-create-policies-files dd-vt-create-secrets-files dd-vt-create-users-files '
+req_tools+='dd-vt-set-up-auth-approles dd-vt-set-up-auth-userpass '
+req_tools+='dd-vt-upload-policies dd-vt-upload-secrets'
 
 
 # -----------------------------------------------------------------------------
 # load functions from library and run as appropriate
 
 # TODO: review this
-# TODO: also do this wherever else vault.lib is sourced (?)
-if   [ -e vault.lib ]
+# TODO: also do this wherever else dd-vt-vault.lib is sourced (?)
+if   [ -e dd-vt-vault.lib ]
 then
-    source vault.lib
-elif [ -e /vault/scripts/vault.lib ]
+    source dd-vt-vault.lib
+elif [ -e /vault/scripts/dd-vt-vault.lib ]
 then
-    source /vault/scripts/vault.lib
+    source /vault/scripts/dd-vt-vault.lib
 fi
 
 if ! determine_platform;            then exit 1; fi
@@ -63,27 +63,27 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: refactor various template approaches to using jq:
 # https://github.com/stedolan/jq/wiki/Cookbook#using-jq-variables-as-template-variables
 # TODO: streamline adding new users:
-#  + call file generation scripts from build-vault
+#  + call file generation scripts from dd-vt-build-vault
 #  + overwrite existing files only if some cmd line flag is passed
 #  + generate passwords instead of using placeholder (unless cmd line param)
 #  + get list of users from Ansible playbook configuration
 #  + same for PKI: overwrite existing files only if cmd line flag is passed
 #  + refine git check to support generating all files for one user
-# TODO: run clear-vault and seal-vault as part of this ?
+# TODO: run dd-vt-clear-vault and dd-vt-seal-vault as part of this ?
 # TODO: get SSH keys from vault instead of generating them out of tool
 # TODO: fix shellcheck messages
 
 
-if ! init-vault            "${config_file}"; then exit 1; fi
-if ! unseal-vault          "${config_file}"; then exit 1; fi
-if ! configure-vault       "${config_file}"; then exit 1; fi
-if ! create-users-files    "${config_file}"; then exit 1; fi
-if ! create-policies-files "${config_file}"; then exit 1; fi
-if ! create-secrets-files  "${config_file}"; then exit 1; fi
-if ! upload-policies       "${config_file}"; then exit 1; fi
-if ! upload-secrets        "${config_file}"; then exit 1; fi
-if ! set-up-auth-approles  "${config_file}"; then exit 1; fi
-if ! set-up-auth-userpass  "${config_file}"; then exit 1; fi
+if ! dd-vt-init-vault            "${config_file}"; then exit 1; fi
+if ! undd-vt-seal-vault          "${config_file}"; then exit 1; fi
+if ! dd-vt-configure-vault       "${config_file}"; then exit 1; fi
+if ! dd-vt-create-users-files    "${config_file}"; then exit 1; fi
+if ! dd-vt-create-policies-files "${config_file}"; then exit 1; fi
+if ! dd-vt-create-secrets-files  "${config_file}"; then exit 1; fi
+if ! dd-vt-upload-policies       "${config_file}"; then exit 1; fi
+if ! dd-vt-upload-secrets        "${config_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-approles  "${config_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-userpass  "${config_file}"; then exit 1; fi
 
 
 echo
