@@ -18,34 +18,44 @@ echo
 # configure script parameters
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# alphabetical list of tools called by this script
-req_tools='dd-vt-configure-vault dd-vt-init-vault dd-vt-unseal-vault '
-req_tools+='dd-vt-create-policies-files dd-vt-create-secrets-files dd-vt-create-users-files '
-req_tools+='dd-vt-set-up-auth-approles dd-vt-set-up-auth-userpass '
-req_tools+='dd-vt-upload-policies dd-vt-upload-secrets'
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-vt-configure-vault' 'dd-vt-init-vault' 'dd-vt-unseal-vault'
+           'dd-vt-create-policies-files' 'dd-vt-create-secrets-files'
+           'dd-vt-create-users-files'
+           'dd-vt-set-up-auth-approles' 'dd-vt-set-up-auth-userpass'
+           'dd-vt-upload-policies' 'dd-vt-upload-secrets')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
 
 
 # -----------------------------------------------------------------------------
-# load functions from library and run as appropriate
+# load BashLib
 
-# TODO: review this
-# TODO: also do this wherever else dd-vt-vault.lib is sourced (?)
-if   [ -e dd-vt-vault.lib ]
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
 then
-    source dd-vt-vault.lib
-elif [ -e /vault/scripts/dd-vt-vault.lib ]
-then
-    source /vault/scripts/dd-vt-vault.lib
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
 fi
 
-if ! determine_platform;            then exit 1; fi
-# pass all arguments to this script
-# on to sub script unchanged:
-# https://stackoverflow.com/a/3816747
-if ! proc_cmd_line_args "$@";       then exit 1; fi
-if ! determine_path_to_sub_scripts; then exit 1; fi
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -71,19 +81,19 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 #  + refine git check to support generating all files for one user
 # TODO: run dd-vt-clear-vault and dd-vt-seal-vault as part of this ?
 # TODO: get SSH keys from vault instead of generating them out of tool
-# TODO: fix shellcheck messages
+# TODO: fix shellcheck messages in all scripts of this project
 
-
-if ! dd-vt-init-vault            "${config_file}"; then exit 1; fi
-if ! dd-vt-unseal-vault          "${config_file}"; then exit 1; fi
-if ! dd-vt-configure-vault       "${config_file}"; then exit 1; fi
-if ! dd-vt-create-users-files    "${config_file}"; then exit 1; fi
-if ! dd-vt-create-policies-files "${config_file}"; then exit 1; fi
-if ! dd-vt-create-secrets-files  "${config_file}"; then exit 1; fi
-if ! dd-vt-upload-policies       "${config_file}"; then exit 1; fi
-if ! dd-vt-upload-secrets        "${config_file}"; then exit 1; fi
-if ! dd-vt-set-up-auth-approles  "${config_file}"; then exit 1; fi
-if ! dd-vt-set-up-auth-userpass  "${config_file}"; then exit 1; fi
+# shellcheck disable=SC2154
+if ! dd-vt-init-vault            "${conf_file}"; then exit 1; fi
+if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
+if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
+if ! dd-vt-create-users-files    "${conf_file}"; then exit 1; fi
+if ! dd-vt-create-policies-files "${conf_file}"; then exit 1; fi
+if ! dd-vt-create-secrets-files  "${conf_file}"; then exit 1; fi
+if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi
+if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-approles  "${conf_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-userpass  "${conf_file}"; then exit 1; fi
 
 
 echo
