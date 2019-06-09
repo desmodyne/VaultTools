@@ -83,6 +83,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 # TODO: get SSH keys from vault instead of generating them out of tool
 # TODO: fix shellcheck messages in all scripts of this project
 
+# NOTE: each script determines vault status and acts accordingly
 # shellcheck disable=SC2154
 if ! dd-vt-init-vault            "${conf_file}"; then exit 1; fi
 if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
