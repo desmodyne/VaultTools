@@ -46,3 +46,21 @@ ENV conf_folder=${vault_home}/config
 
 # copy configuration file
 COPY data/mirror/ci-vault-server/vault/config/vault.hcl "${conf_folder}"
+
+# network port the vault instance is running on
+# NOTE: this is already done in base container
+# EXPOSE 8200
+
+# NOTE: the base Dockerfile uses
+#   CMD ["server", "-dev"]
+# to run a dev server:
+#   https://www.vaultproject.io/docs/concepts/dev-server.html
+# the canonical way to run a production server, i.e.
+#   CMD ["server", "--config", "/vault/config"]
+# fails with
+#   Error initializing listener of type tcp:
+#      listen tcp4 0.0.0.0:8200: bind: address already in use
+# apparently because "--config", "/vault/config" is used per default:
+#   https://github.com/hashicorp/docker-vault/issues/109
+# need to run in server mode using defaults
+CMD ["server"]

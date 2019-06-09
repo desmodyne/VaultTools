@@ -17,7 +17,7 @@
 *
 
 # ... except for exceptions
-!code/vault
+!code/bin
 !conf/vault
 !data/mirror
 !data/tmpl

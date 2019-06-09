@@ -17,10 +17,7 @@ mgmt_user_name: ansible
 organization: DesmoDyne
 
 # vault server protocol, host and port
-# https://docs.docker.com/docker-for-mac/networking/#use-cases-and-workarounds
-#   "This is for development purpose and will not work in a
-#    production environment outside of Docker Desktop for Mac."
-vault_address: http://host.docker.internal:8200
+vault_address: http://0.0.0.0:8200
 
 # path to vault log file on its host
 # NOTE: this needs to match path set in vault base Dockerfile:

@@ -78,6 +78,6 @@ RUN apk update && apk add --no-cache bash curl jq python py-pip && \
     chmod a+x /usr/local/bin/yq && \
     pip install --upgrade pip && pip install j2cli
 
-COPY code/vault "${scripts_folder}"
+COPY code/bin   "${scripts_folder}"
 COPY conf/vault "${conf_folder}"
 COPY data/tmpl  "${tmpl_folder}"
