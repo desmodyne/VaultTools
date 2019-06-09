@@ -17,40 +17,29 @@ echo
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# path from this script to project root
-path_to_proj_root='../..'
-
 # absolute path to this script: http://stackoverflow.com/a/9107028
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# path to BashLib library file, relative to project root
-path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
+# path from this script to project root
+path_to_proj_root='../..'
 
-# path to Docker scripts, relative to project root
-# TODO: this assumes Infrastructure repo is available at that location
-path_to_docker_bin='../../Infrastructure/Services/Infrastructure/Docker/code/bin'
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
-# NOTE: realpath fails if path does not exist
-
-# absolute, canonical path to project root
-path_to_proj_root="$( realpath "${here}/${path_to_proj_root}")"
-
-# absolute, canonical path to BashLib library file
-path_to_bashlib="$(   realpath "${path_to_proj_root}/${path_to_bashlib}")"
-
-# absolute, canonical path to Docker scripts
-path_to_docker_bin="$(realpath "${path_to_proj_root}/${path_to_docker_bin}")"
+# path to script configuration file, relative to project root
+# for .../cicd/bin/script, use .../cicd/conf/script.yaml conf file
+path_to_conf_file="cicd/conf/$(basename "${BASH_SOURCE[0]}").yaml"
 
 # TODO: shellcheck reports these to be unused
 # https://github.com/koalaman/shellcheck/wiki/SC2034
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('build-cont-images')
+req_tools=('dd-build-cont-images' 'realpath')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
-ext_paths=("${path_to_docker_bin}")
+ext_paths=()
 
 
 # -----------------------------------------------------------------------------
@@ -61,14 +50,14 @@ ext_paths=("${path_to_docker_bin}")
 # so a second source for use in here is required
 # https://github.com/koalaman/shellcheck/wiki/SC1090
 # shellcheck disable=SC1090
-if ! output="$(source "${path_to_bashlib}" 2>&1)"
+if output="$(source "${path_to_bashlib}" 2>&1)"
 then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
     echo "${output}"
     exit 1
 fi
-
-# shellcheck disable=SC1090
-source "${path_to_bashlib}"
 
 
 # -----------------------------------------------------------------------------
@@ -84,16 +73,71 @@ source "${path_to_bashlib}"
 
 if ! configure_platform              ; then exit 1; fi
 if ! extend_path req_tools ext_paths ; then exit 1; fi
-if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to configuration file
+path_to_conf_file="${path_to_proj_root}/${path_to_conf_file}"
 
 
 # -----------------------------------------------------------------------------
 # call the other scripts in the designated order
 
-# conf_file is defined by proc_cmd_line_args
+# BashLib is required in container; used by run script
+
+# TODO: something creates a folder .../null and deletes it after build
+# TODO: do this in a much better way
+# TODO: get stuff from config
+
+path_to_temp="${path_to_proj_root}/tmp/build"
+
+echo -n 'create temporary folder: '
+# shellcheck disable=SC2154
+if output="$(mkdir -p "${path_to_temp}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "  ${output}"
+    exit 1
+fi
+
+echo -n 'copy BashLib to temporary folder: '
+# shellcheck disable=SC2154
+if output="$(cp "${path_to_bashlib}" "${path_to_temp}/" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "  ${output}"
+    exit 1
+fi
+
+# BashLib file usually has 0444 permissions;
+# fails when running this script a second time
+
+echo -n 'adjust BashLib file access permissions: '
+# shellcheck disable=SC2154
+if output="$(chmod 0644 "${path_to_temp}/dd-bash-lib.sh" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "  ${output}"
+    exit 1
+fi
+
+
+conf_file="${path_to_conf_file}"
+
 # https://github.com/koalaman/shellcheck/wiki/SC2154
 # shellcheck disable=SC2154
-if ! build-cont-images "${conf_file}"; then exit 1; fi
+if ! dd-build-cont-images "${conf_file}"; then exit 1; fi
 
 
 echo 'project artifacts build complete'

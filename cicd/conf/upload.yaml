@@ -1,0 +1,35 @@
+---
+# upload.yaml
+#
+# CI/CD scripts configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-10-07
+
+
+# container namespace used locally when building image
+local_namespace: desmodyne
+
+# container namespace used when uploading image to gitlab registry
+# NOTE: this goes into the docker registry url and must be all lowercase,
+# otherwise tagging the image fails with
+#   Error parsing reference: "<repo url>:<tag>" is not a valid repository/tag:
+#   invalid reference format: repository name must be lowercase
+gitlab_namespace: desmodyne/tools/vaulttools
+
+# gitlab container registry url
+gitlab_reg_url: registry.gitlab.com
+
+
+# list of data sets to configure container images
+images:
+
+  # name of the container image
+  ci-vault-client:
+
+    # container image tag
+    image_tag: latest
+
+  ci-vault-server:
+    image_tag: latest
