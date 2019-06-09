@@ -21,7 +21,7 @@ echo
 path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # alphabetical list of tools called by this script
-req_tools='dd-vt-configure-vault dd-vt-init-vault undd-vt-seal-vault '
+req_tools='dd-vt-configure-vault dd-vt-init-vault dd-vt-unseal-vault '
 req_tools+='dd-vt-create-policies-files dd-vt-create-secrets-files dd-vt-create-users-files '
 req_tools+='dd-vt-set-up-auth-approles dd-vt-set-up-auth-userpass '
 req_tools+='dd-vt-upload-policies dd-vt-upload-secrets'
@@ -75,7 +75,7 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 
 
 if ! dd-vt-init-vault            "${config_file}"; then exit 1; fi
-if ! undd-vt-seal-vault          "${config_file}"; then exit 1; fi
+if ! dd-vt-unseal-vault          "${config_file}"; then exit 1; fi
 if ! dd-vt-configure-vault       "${config_file}"; then exit 1; fi
 if ! dd-vt-create-users-files    "${config_file}"; then exit 1; fi
 if ! dd-vt-create-policies-files "${config_file}"; then exit 1; fi
