@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+
+# deploy
+#
+# deploy all artifacts of this project
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-12-25
+
+
+# NOTE: see build script for some possibly informative comments
+
+
+echo
+echo 'deploy project artifacts'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# path to script configuration file, relative to project root
+path_to_conf_file="cicd/conf/$(basename "${BASH_SOURCE[0]}").yaml"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-run-remote' 'jq' 'realpath' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# absolute, canonical path to project root
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# absolute, canonical path to configuration file
+path_to_conf_file="${path_to_proj_root}/${path_to_conf_file}"
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+if output="$(yq read "${path_to_conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+for attr in files_to_copy local_tmp_dir
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# copy files to temp location and prepare them for use on remote host
+
+# required so dd-run-remote can access these files at a defined location;
+# this script and dd-run-remote are in separate projects and don't share a base
+
+did_create_folder=false
+
+# shellcheck disable=SC2154
+if [ ! -d "${local_tmp_dir}" ]
+then
+    echo
+    echo "create local temp folder: ${local_tmp_dir}"
+    mkdir -p "${local_tmp_dir}"
+    did_create_folder=true
+fi
+
+# jq expression to get values
+# from various json object levels
+# https://stackoverflow.com/a/45466966
+jq_expr='to_entries[] | .value = if .value|type '
+jq_expr+='== "array" then .value[] else .value end | .value'
+
+# https://stackoverflow.com/a/23118607
+# https://wiki-dev.bash-hackers.org/commands/builtin/mapfile
+# shellcheck disable=SC2154
+mapfile -t file_spec_list < <(jq -r "${jq_expr}" <<< "${files_to_copy}")
+
+# https://stackoverflow.com/a/8880633
+# https://unix.stackexchange.com/a/193042
+# sample output:
+#   file spec count: 5
+#   file spec: /usr/local/lib/dd-bash-lib.sh
+#   file spec: cicd/conf/cicd.yaml
+#   file spec: code/docker/<project-specific path>/Dockerfile
+#   file spec: dd-download-cont-images-from-gitlab
+#   file spec: dd-run-cont-images
+#
+# echo "file spec count: ${#file_spec_list[@]}"
+# for file_spec in "${file_spec_list[@]}"
+# do
+#     echo "file spec: ${file_spec}"
+# done
+
+
+echo
+echo 'process file specs:'
+for file_spec in "${file_spec_list[@]}"
+do
+    echo "  ${file_spec}: "
+
+    echo -n '    resolve file spec: '
+
+    # if file spec is an absolute path,
+    # https://stackoverflow.com/a/11403912
+    if [[ "${file_spec}" == /* ]]
+    then
+        # if the file exists,
+        if [ -f "${file_spec}" ]
+            then
+            # use it unchanged
+            source_path="${file_spec}"
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "    ${file_spec} - no such file"
+            exit 1
+        fi
+
+    # if file spec is a relative path,
+    else
+        # if there is no path component,
+        if [ "$(dirname "${file_spec}")" = '.' ]
+        then
+            # if the file exists in project space,
+            if [ -f "${path_to_proj_root}/${file_spec}" ]
+            then
+                # prepend path to root of this project
+                source_path="${path_to_proj_root}/${file_spec}"
+                echo 'OK'
+
+            # otherwise,
+            else
+                # try to find it as command in path
+                output="$(command -v "${file_spec}")"
+                if [ -n "${output}" ]
+                then
+                    source_path="${output}"
+                    echo 'OK'
+                else
+                    echo 'ERROR'
+                    echo "    ${file_spec} - no such file and not a command"
+                    exit 1
+                fi
+            fi
+
+        # otherwise,
+        else
+            # if the file exists in project space,
+            if [ -f "${path_to_proj_root}/${file_spec}" ]
+                then
+                # prepend path to root of this project
+                source_path="${path_to_proj_root}/${file_spec}"
+                echo 'OK'
+            else
+                echo 'ERROR'
+                echo "    ${file_spec} - no such file"
+                exit 1
+            fi
+        fi
+    fi
+
+    echo -n '    copy file to temp location: '
+    if output="$(cp "${source_path}" "${local_tmp_dir}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        exit 1
+    fi
+
+    # req'd so files copied from e.g. /usr/local/bin
+    # can be deleted from temp location afterwards
+    echo -n '    adjust file permissions: '
+    filename="$(basename "${source_path}")"
+    if output="$(chmod u+w "${local_tmp_dir}/${filename}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        exit 1
+    fi
+done
+
+
+bashlib_file="$(jq -r '.bashlib_file'   <<< "${files_to_copy}")"
+config_file="$( jq -r '.config_file'    <<< "${files_to_copy}")"
+cont_file="$(   jq -r '.cont_file'      <<< "${files_to_copy}")"
+script_names="$(jq -r '.script_names[]' <<< "${files_to_copy}")"
+
+bashlib_file="$(basename "${bashlib_file}")"
+config_file="$( basename "${config_file}")"
+local_path="$(  dirname  "${cont_file}")/"
+
+
+
+# TODO: get this from conf as template
+sed_expr="s|path_to_bashlib=.*|path_to_bashlib=${bashlib_file}|g"
+
+echo
+echo 'remove BashLib file path in script files:'
+for script_name in ${script_names}
+do
+    script_name="${local_tmp_dir}/$(basename "${script_name}")"
+    echo -n "  ${script_name}: "
+    # shellcheck disable=SC2154
+    if output="$("${sed}" -i -e "${sed_expr}" "${script_name}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+done
+
+echo -n 'remove docker-compose file path in config file: '
+# shellcheck disable=SC2154
+if output="$("${sed}" -i -e "s|${local_path}||g" \
+                  "${local_tmp_dir}/${config_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "  ${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run script on remote host
+
+# TODO: switch to python venv that provides req'd pip packages, e.g. fabric;
+# for now, just install packages globally using sudo pip install fabric PyYAML
+
+echo
+echo 'run script on remote host:'
+echo
+
+# dd-run-remote displays its own log output
+# setting LC_ALL is required by dd-run-remote
+# TODO: this fails at times with
+#   paramiko.ssh_exception.PasswordRequiredException:
+#     Private key file is encrypted
+# which can be fixed by logging into the remote host
+# using ssh and logging right back out;
+# get this to work reliably without this workaround
+# shellcheck disable=SC2154
+if ! LC_ALL=en_US.UTF-8 dd-run-remote "${path_to_conf_file}"
+then
+    exit 1
+fi
+
+echo 'script run on remote host complete'
+
+
+# -----------------------------------------------------------------------------
+# remove files at temp location
+
+echo
+echo 'delete files at temp location:'
+for file_to_delete in "${file_spec_list[@]}"
+do
+    filename="$(basename "${file_to_delete}")"
+    echo -n "  ${local_tmp_dir}/${filename}: "
+    if output="$(rm "${local_tmp_dir}/${filename}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+done
+
+if [ "${did_create_folder}" = true ]
+then
+    echo
+    echo "delete local temp folder: ${local_tmp_dir}"
+    rm -fr "${local_tmp_dir}"
+fi
+
+
+echo
+echo 'project artifacts deployment complete'
+echo
