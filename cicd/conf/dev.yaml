@@ -1,0 +1,27 @@
+---
+# dev.yaml
+#
+# CI/CD script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-10-07
+
+
+# NOTE: these are somewhat redundant, also set in ./cicd.yaml
+
+# name of the container image
+image_name: desmodyne/ci-vault-server
+
+# additional Linux container capabilities:
+#
+cont_caps:  IPC_LOCK
+
+# name of container when run off image
+cont_name:  ct-vault-server
+
+# network ports exposed by container on host network interface
+cont_ports: "8200:8200"
+
+# follow container logs since timestamp, see docker logs --help > --since
+log_since:  1h
