@@ -25,11 +25,9 @@ path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('dd-vt-configure-vault' 'dd-vt-init-vault' 'dd-vt-unseal-vault'
-           'dd-vt-create-policies-files' 'dd-vt-create-secrets-files'
-           'dd-vt-create-users-files' 'dd-vt-set-up-auth-methods'
-           'dd-vt-set-up-auth-approles' 'dd-vt-set-up-auth-userpass'
-           'dd-vt-upload-policies' 'dd-vt-upload-secrets')
+req_tools=('dd-vt-configure-vault'     'dd-vt-init-vault'
+           'dd-vt-set-up-auth-methods' 'dd-vt-unseal-vault'
+           'dd-vt-upload-policies'     'dd-vt-upload-secrets')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -90,13 +88,8 @@ if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
 if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
 if ! dd-vt-set-up-auth-methods   "${conf_file}"; then exit 1; fi
 
-# if ! dd-vt-create-users-files    "${conf_file}"; then exit 1; fi
-# if ! dd-vt-create-policies-files "${conf_file}"; then exit 1; fi
-# if ! dd-vt-create-secrets-files  "${conf_file}"; then exit 1; fi
 # if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi
 # if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
-# if ! dd-vt-set-up-auth-approles  "${conf_file}"; then exit 1; fi
-# if ! dd-vt-set-up-auth-userpass  "${conf_file}"; then exit 1; fi
 
 
 echo
