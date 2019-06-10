@@ -89,7 +89,7 @@ if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
 if ! dd-vt-set-up-auth-methods   "${conf_file}"; then exit 1; fi
 
 # if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi
-# if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
+if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
 
 
 echo
