@@ -30,6 +30,8 @@ hostname:cc-vault_docker_hub username$ docker-compose up
   ...
 ```
 
+This starts two Docker containers on the local machine, a HashiCorp Vault server that listens on `http://localhost:8200` and a HashiCorp Vault client that connects to the server and performs some basic / example configuration. Check the client container log for some rudimentary output about what is being done. After completion, both containers are left running for inspection:
+
 ### Inspect containers
 
 + create a second shell / Terminal session

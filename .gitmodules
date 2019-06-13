@@ -1,4 +1,0 @@
-[submodule "ext/BashLib"]
-	path = ext/BashLib
-	url = https://dd-ssc@gitlab.com/DesmoDyne/Tools/bashlib.git
-	branch = master

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# build-vault
+# dd-vt-build-vault
 #
 # initialize and configure a vault instance and add users, policies and secrets
 #
@@ -18,34 +18,42 @@ echo
 # configure script parameters
 
 # absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# alphabetical list of tools called by this script
-req_tools='configure-vault init-vault unseal-vault '
-req_tools+='create-policies-files create-secrets-files create-users-files '
-req_tools+='set-up-auth-approles set-up-auth-userpass '
-req_tools+='upload-policies upload-secrets'
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-vt-configure-vault'     'dd-vt-init-vault' 'dd-vt-seal-vault'
+           'dd-vt-set-up-auth-methods' 'dd-vt-unseal-vault'
+           'dd-vt-upload-policies'     'dd-vt-upload-secrets')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
 
 
 # -----------------------------------------------------------------------------
-# load functions from library and run as appropriate
+# load BashLib
 
-# TODO: review this
-# TODO: also do this wherever else vault.lib is sourced (?)
-if   [ -e vault.lib ]
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
 then
-    source vault.lib
-elif [ -e /vault/scripts/vault.lib ]
-then
-    source /vault/scripts/vault.lib
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
 fi
 
-if ! determine_platform;            then exit 1; fi
-# pass all arguments to this script
-# on to sub script unchanged:
-# https://stackoverflow.com/a/3816747
-if ! proc_cmd_line_args "$@";       then exit 1; fi
-if ! determine_path_to_sub_scripts; then exit 1; fi
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -63,27 +71,26 @@ if ! determine_path_to_sub_scripts; then exit 1; fi
 # TODO: refactor various template approaches to using jq:
 # https://github.com/stedolan/jq/wiki/Cookbook#using-jq-variables-as-template-variables
 # TODO: streamline adding new users:
-#  + call file generation scripts from build-vault
+#  + call file generation scripts from dd-vt-build-vault
 #  + overwrite existing files only if some cmd line flag is passed
 #  + generate passwords instead of using placeholder (unless cmd line param)
 #  + get list of users from Ansible playbook configuration
 #  + same for PKI: overwrite existing files only if cmd line flag is passed
 #  + refine git check to support generating all files for one user
-# TODO: run clear-vault and seal-vault as part of this ?
+# TODO: run dd-vt-clear-vault and dd-vt-seal-vault as part of this ?
 # TODO: get SSH keys from vault instead of generating them out of tool
-# TODO: fix shellcheck messages
+# TODO: fix shellcheck messages in all scripts of this project
 
+# NOTE: each script determines vault status and acts accordingly
+# shellcheck disable=SC2154
+if ! dd-vt-init-vault            "${conf_file}"; then exit 1; fi
+if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
+if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-methods   "${conf_file}"; then exit 1; fi
 
-if ! init-vault            "${config_file}"; then exit 1; fi
-if ! unseal-vault          "${config_file}"; then exit 1; fi
-if ! configure-vault       "${config_file}"; then exit 1; fi
-if ! create-users-files    "${config_file}"; then exit 1; fi
-if ! create-policies-files "${config_file}"; then exit 1; fi
-if ! create-secrets-files  "${config_file}"; then exit 1; fi
-if ! upload-policies       "${config_file}"; then exit 1; fi
-if ! upload-secrets        "${config_file}"; then exit 1; fi
-if ! set-up-auth-approles  "${config_file}"; then exit 1; fi
-if ! set-up-auth-userpass  "${config_file}"; then exit 1; fi
+# if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi
+if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
+if ! dd-vt-seal-vault            "${conf_file}"; then exit 1; fi
 
 
 echo

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# clear-vault
+# dd-vt-clear-vault
 #
 # clear vault, i.e remove all policies, secrets, users
 #
@@ -19,7 +19,7 @@ echo
 
 # see also build-vault
 
-source vault.lib
+source dd-vt-vault.lib
 
 if ! determine_platform;            then exit 1; fi
 if ! proc_cmd_line_args "$@";       then exit 1; fi

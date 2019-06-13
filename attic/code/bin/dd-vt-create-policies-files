@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# create-policies-files
+# dd-vt-create-policies-files
 #
 # generate configuration files for vault policies in secure location
 #
@@ -9,64 +9,125 @@
 # created : 2018-02-21
 
 
+# NOTE: see also dd-vt-init-vault
+
+
 echo
 echo 'Create HashiCorp Vault policy files'
 echo
 
 
 # -----------------------------------------------------------------------------
-# load functions from library and run as appropriate
+# configure script parameters
 
-# see also build-vault
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-source vault.lib
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
-if ! determine_platform;            then exit 1; fi
-if ! proc_cmd_line_args "$@";       then exit 1; fi
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('jq' 'j2' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
 # load script configuration
 
-# NOTE: see config file for parameter documentation
-# TODO: error handling, e.g. check if key_file is available
-# TODO: review output, message only if error or -v / --verbose
+echo
 
-# http://mikefarah.github.io/yq
-config="$(yq -j r "${config_file}")"
+echo -n 'Load script configuration file: '
+# conf_file is defined by get_conf_file_arg
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
 
-path_to_sec_loc="$(    jq -r '.path_to_sec_loc'     <<< "${config}")"
-path_to_tmpl_folder="$(jq -r '.path_to_tmpl_folder' <<< "${config}")"
-policies_folder="$(    jq -r '.policies_folder'     <<< "${config}")"
+echo -n 'Extract script configuration attributes: '
+for attr in path_to_sec_loc path_to_tmpl_folder \
+            policies_folder secrets
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
 
-# compound configuration sections
-secrets_json="$(       jq -r '.secrets'             <<< "${config}")"
 
 # TODO: review jq exprs to make these scalable beyond one path
 
 # json data structure with secrets for each service
-serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets_json}")"
+serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets}")"
 
 # json data structure with secrets for each user
-user_secrets="$(jq '.[] | select(.context=="user")'    <<< "${secrets_json}")"
+user_secrets="$(jq '.[] | select(.context=="user")'    <<< "${secrets}")"
 
 
 # -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
 if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
 # configure script parameters
 
-# absolute path to this script: http://stackoverflow.com/a/9107028
-path_to_this_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# full path to root folder for policies configuration files
+path_to_policies_root="${path_to_sec_loc}/${policies_folder}"
 
-# path from this script to project root
-rel_path_to_project_root='../..'
-
-# absolute path to project root
-path_to_project_root="$(realpath \
-                        "${path_to_this_script}/${rel_path_to_project_root}")"
+# TODO: get these from conf
 
 # name of service policy template file
 serv_tmpl_file_name='service_policy.hcl.j2'
@@ -88,26 +149,12 @@ user_tmpl_data_tmpl_name='user_policy_tmpl.json.j2'
 # }
 # EOT
 
-# full path to root folder for policies configuration files
-path_to_policies_root="${path_to_sec_loc}/${policies_folder}"
-
-
-# -----------------------------------------------------------------------------
-if ! validate_secure_location;      then exit 1; fi
-
 
 # -----------------------------------------------------------------------------
 # create policies configuration file
 
 
 # TODO: only do this if any services or users are configured
-
-if ! pushd "${path_to_project_root}" > /dev/null
-then
-    echo "failed to pushd to project root ${path_to_project_root}"
-    exit
-fi
-
 
 # TODO: continue or exit ?
 
@@ -190,11 +237,19 @@ do
 done
 
 
+# TODO: used to debug, remove this:
+# echo "user_secrets: ${user_secrets}"
+
 if [ -z "${user_secrets}" ]
 then
     echo 'no users configured; skip creating user policy files'
 else
+    # TODO: FIX THIS: iterating over path and assigning to user names ?!?
     user_names="$(jq -r '.sec_confs[].path' <<< "${user_secrets}" | xargs)"
+    if [ "${user_names}" = 'null' ]
+    then
+        user_names=''
+    fi
 fi
 
 for user_name in ${user_names}
@@ -264,13 +319,6 @@ do
 
     echo "  file created: ${path_to_conf_file}"
 done
-
-
-if ! popd > /dev/null
-then
-    echo "failed to popd from project root ${path_to_project_root}"
-    exit
-fi
 
 
 echo

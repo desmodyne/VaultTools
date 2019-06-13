@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+
+# dd-vt-seal-vault
+#
+# close vault so users can no longer log in nor read / write secrets
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-19
+
+
+# https://www.vaultproject.io/api/system/seal.html
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Seal HashiCorp Vault'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# conf_file is defined by get_conf_file_arg
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+for attr in key_file_name path_to_sec_loc vault_address
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is already sealed"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# seal vault
+
+echo 'seal vault:'
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+# TODO: get this from elsewhere
+jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+echo -n 'seal vault: '
+if output="$(curl --header "X-Vault-Token: ${root_token}" \
+                  --request PUT                           \
+                  --show-error                            \
+                  --silent                                \
+                  "${vault_address}/v1/sys/seal" 2>&1)"
+then
+    if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+    then
+        echo 'OK'
+        exist_secrets_json="${output}"
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'HashiCorp Vault seal complete'
+echo
