@@ -168,7 +168,9 @@ do
                       "${vault_address}/v1/sys/unseal" 2>&1)"
     then
         # if successful, curl returns 0 and
-        # output is json with unseal status
+        # output is json with unseal status;
+        # otherwise, curl also returns 0 and
+        # error message is returned in response
 
         # sample success response:
         # {
@@ -180,9 +182,9 @@ do
         #   "nonce": "60707b37-dc3c-a3f1-720c-d9475ff12a65",
         #   "version": "0.9.3"
         # }
-        # TODO: better success detection - how about success: true in response ?
         if progress="$(jq -r '.progress' <<< "${output}" 2>&1)" && \
-           total="$(   jq -r '.t'        <<< "${output}" 2>&1)"
+           total="$(   jq -r '.t'        <<< "${output}" 2>&1)" && \
+           [ "${progress}" != 'null' ] && [ "${total}" != 'null' ]
         then
             echo "OK - ${progress} / ${total}"
 
