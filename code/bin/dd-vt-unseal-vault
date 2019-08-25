@@ -37,7 +37,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'jq' 'yq')
+req_tools=('curl' 'git' 'jq' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -95,7 +95,7 @@ else
 fi
 
 echo -n 'Extract script configuration attributes: '
-for attr in key_file_name path_to_sec_loc vault_address
+for attr in info_file_name key_file_name path_to_sec_loc vault_address
 do
     # https://unix.stackexchange.com/a/68349
     declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
@@ -123,6 +123,10 @@ if ! validate_secure_location;      then exit 1; fi
 # full path to file with key and token info
 # shellcheck disable=SC2154
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+# full path to file with vault UUID and status info
+# shellcheck disable=SC2154
+path_to_info_file="${path_to_sec_loc}/${info_file_name}"
 
 
 # -----------------------------------------------------------------------------
@@ -168,7 +172,9 @@ do
                       "${vault_address}/v1/sys/unseal" 2>&1)"
     then
         # if successful, curl returns 0 and
-        # output is json with unseal status
+        # output is json with unseal status;
+        # otherwise, curl also returns 0 and
+        # error message is returned in response
 
         # sample success response:
         # {
@@ -180,9 +186,9 @@ do
         #   "nonce": "60707b37-dc3c-a3f1-720c-d9475ff12a65",
         #   "version": "0.9.3"
         # }
-        # TODO: better success detection - how about success: true in response ?
         if progress="$(jq -r '.progress' <<< "${output}" 2>&1)" && \
-           total="$(   jq -r '.t'        <<< "${output}" 2>&1)"
+           total="$(   jq -r '.t'        <<< "${output}" 2>&1)" && \
+           [ "${progress}" != 'null' ] && [ "${total}" != 'null' ]
         then
             echo "OK - ${progress} / ${total}"
 
@@ -215,6 +221,57 @@ done
 if [ "${sealed}" = 'true' ]
 then
     echo 'failed to unsealed vault'
+    exit 1
+fi
+
+# NOTE: the vault UUID is only available after unsealing the vault
+# NOTE: this somewhat duplicates dd-vt-vault.lib > get_vault_status,
+# but here, the actual output is needed and not only the status code
+echo -n 'get vault status: '
+if output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+then
+    echo 'OK'
+    vault_status="${output}"
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'save vault status to info file: '
+if output="$(echo "${vault_status}" > "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: path_to_sec_loc is not the git repo root folder
+
+echo -n 'stage vault info file: '
+if output="$(git -C "${path_to_sec_loc}" add "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: add vault UUID and public / private info
+git_msg='add vault status file'
+
+echo -n 'commit vault info file: '
+# shellcheck disable=SC2154
+if output="$(git -C "${path_to_sec_loc}" \
+                 commit -m "${git_msg}" "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
     exit 1
 fi
 

@@ -31,7 +31,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'jq' 'yq')
+req_tools=('curl' 'git' 'jq' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -218,6 +218,34 @@ else
     echo "${output}"
     exit 1
 fi
+
+# TODO: path_to_sec_loc is not the git repo root folder
+
+echo -n 'stage init response file: '
+if output="$(git -C "${path_to_sec_loc}" add "${path_to_key_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: add vault UUID and public / private info
+git_msg='initialize vault'
+
+echo -n 'commit init response file: '
+# shellcheck disable=SC2154
+if output="$(git -C "${path_to_sec_loc}" \
+                 commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
 
 echo
 echo 'HashiCorp Vault instance initialization complete'
