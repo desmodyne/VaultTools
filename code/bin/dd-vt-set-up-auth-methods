@@ -101,6 +101,7 @@ if ! validate_secure_location;      then exit 1; fi
 # configure script parameters
 
 # full path to file with key and token info
+# shellcheck disable=SC2154
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
 
@@ -139,6 +140,7 @@ function set_up_approle
 
     # NOTE: the vault CLI doesn't seem to support listing roles
     # https://www.vaultproject.io/api/auth/approle/index.html#list-roles
+    # shellcheck disable=SC2154
     full_url="${vault_address}/v1/auth/approle/role"
 
     echo -n '      get existing approle roles: '
@@ -265,6 +267,7 @@ fi
 
 # TODO: this does not support enabling an auth method at a non-default path
 
+# shellcheck disable=SC2154
 if [ "${auth_methods}" = 'null' ]
 then
     echo 'no auth methods configured; skip setup'

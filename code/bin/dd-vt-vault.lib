@@ -54,6 +54,7 @@ function get_vault_status
     #     "recovery_seal": false
     #   }
 
+    # shellcheck disable=SC2154
     output="$(vault status -address="${vault_address}" -format=json 2>&1)"
     res=$?
 
@@ -105,6 +106,7 @@ function validate_config_settings
     # TODO: verify path_to_sec_loc is an absolute path ?
     # TODO: resolve symbolic links into real path ?
 
+    # shellcheck disable=SC2154
     if [ -e "${path_to_sec_loc}" ]
     then
         if [ -d "${path_to_sec_loc}" ]
@@ -120,6 +122,7 @@ function validate_config_settings
         # split paths into its components
         # https://askubuntu.com/a/600252
         # TODO: this fails with whitespace in path
+        # shellcheck disable=SC2154
         comps="$("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")"
 
         # turn path components into array

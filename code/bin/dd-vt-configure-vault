@@ -117,7 +117,8 @@ case "${res}" in
         ;;
     2)  #
         ;;
-    3)  echo "vault at ${vault_address} is not yet initialized"
+    3)  # shellcheck disable=SC2154
+        echo "vault at ${vault_address} is not yet initialized"
         ;;
 esac
 
@@ -173,6 +174,7 @@ for audit_line in ${audit_lines}
 do
     # output contains control characters
     # https://unix.stackexchange.com/a/96485
+    # shellcheck disable=SC2154
     clean_line="$(tail -n 1 <<< "${audit_line}" \
                  | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
 
@@ -183,6 +185,7 @@ do
     attributes=(${clean_line})
     OLD_IFS="${IFS}" && IFS=$'\n'
 
+    # shellcheck disable=SC2154
     if [ "${attributes[1]}" = 'file' ] && \
        [ "${attributes[4]}" = "file_path=${path_to_log_file}" ]
     then
