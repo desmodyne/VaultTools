@@ -81,33 +81,15 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 echo
 
-echo -n 'Load script configuration file: '
-# conf_file is defined by get_conf_file_arg
-# shellcheck disable=SC2154
-if output="$(yq read "${conf_file}" --tojson 2>&1)"
-then
-    echo 'OK'
-    config="${output}"
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
+# shellcheck disable=SC2034
+attrs=(info_file_name key_file_name path_to_sec_loc vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
 
-echo -n 'Extract script configuration attributes: '
-for attr in info_file_name key_file_name path_to_sec_loc vault_address
-do
-    # https://unix.stackexchange.com/a/68349
-    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
-    # https://unix.stackexchange.com/a/41418
-    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
-    then
-        echo 'ERROR'
-        echo "Failed to get ${attr} attribute from configuration"
-        exit 1
-    fi
-done
-echo 'OK'
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
