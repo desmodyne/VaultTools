@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# dd-vt-build-vault
+#
+# initialize and configure a vault instance and add users, policies and secrets
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-23
+
+
+echo
+echo 'Build HashiCorp Vault instance'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('dd-vt-configure-vault'     'dd-vt-init-vault' 'dd-vt-seal-vault'
+           'dd-vt-set-up-auth-methods' 'dd-vt-unseal-vault'
+           'dd-vt-upload-policies'     'dd-vt-upload-secrets')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# call the other scripts in the designated order
+
+# TODO: review error handling (use trap with error function ?)
+# TODO: must a vault be unsealed for setup ?
+# TODO: with a new vault and a clean repo, this script should run without error
+# TODO: set up global convention if cURL / REST API ./. command line client
+# TODO: globally, use root token only where absolutely required:
+# https://www.vaultproject.io/guides/identity/authentication.html#policy-requirements
+# TODO: for all scripts that log into vault: revoke root token afterwards
+# TODO: set up unit-testing:
+# https://medium.com/@pimterry/testing-your-shell-scripts-with-bats-abfca9bdc5b9
+# TODO: refactor various template approaches to using jq:
+# https://github.com/stedolan/jq/wiki/Cookbook#using-jq-variables-as-template-variables
+# TODO: streamline adding new users:
+#  + call file generation scripts from dd-vt-build-vault
+#  + overwrite existing files only if some cmd line flag is passed
+#  + generate passwords instead of using placeholder (unless cmd line param)
+#  + get list of users from Ansible playbook configuration
+#  + same for PKI: overwrite existing files only if cmd line flag is passed
+#  + refine git check to support generating all files for one user
+# TODO: run dd-vt-clear-vault and dd-vt-seal-vault as part of this ?
+# TODO: get SSH keys from vault instead of generating them out of tool
+# TODO: fix shellcheck messages in all scripts of this project
+
+# NOTE: each script determines vault status and acts accordingly
+# shellcheck disable=SC2154
+if ! dd-vt-init-vault            "${conf_file}"; then exit 1; fi
+if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
+if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
+if ! dd-vt-set-up-auth-methods   "${conf_file}"; then exit 1; fi
+
+# if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi
+if ! dd-vt-upload-secrets        "${conf_file}"; then exit 1; fi
+if ! dd-vt-seal-vault            "${conf_file}"; then exit 1; fi
+
+
+echo
+echo 'HashiCorp Vault instance build complete'
+echo
+
+# https://stackoverflow.com/a/25518345
+# TODO: remove this once development is complete
+if [ -f /.dockerenv ]
+then
+    echo 'Keep container running for inspection'
+    tail -f /dev/null
+fi

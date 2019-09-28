@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+
+# dd-vt-set-up-auth-userpass
+#
+# set up UserPass authentication method
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-21
+
+
+# https://www.vaultproject.io/api/auth/userpass/index.html
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Set up HashiCorp Vault UserPass authentication'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# conf_file is defined by get_conf_file_arg
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+for attr in key_file_name path_to_sec_loc placeholder \
+            users         users_folder    vault_address
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# set up userpass authentication
+
+if [ "${users_json}" = 'null' ]
+then
+    echo 'no users configured; skip setting up userpass authentication'
+    echo
+    echo 'HashiCorp Vault UserPass authentication setup complete'
+    echo
+    exit
+else
+    user_names="$(jq -r '.[].name' <<< "${users_json}" | xargs)"
+fi
+
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+echo -n 'log into vault: '
+if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# https://www.vaultproject.io/api/system/auth.html
+
+# TODO: the http api call does not return a response,
+# but a godawful mess of data, most of it duplicate:
+# https://stackoverflow.com/q/48904371
+# if output="$(curl --header "X-Vault-Token: ${root_token}" \
+#                   --show-error                            \
+#                   --silent                                \
+#                   "${vault_address}/v1/sys/auth" 2>&1)"
+
+# TODO: from https://stackoverflow.com/a/48904944:
+# jq -r '. as $o | keys[] | select(endswith("/")) | $o[.].type' <<< "${output}"
+
+# https://www.vaultproject.io/docs/commands/auth/list.html
+
+# TODO: any combination of this fails with
+# flag provided but not defined: -format
+# vault auth list -detailed -format json
+
+# TODO: does output contain control characters ?
+
+# sample output:
+#
+# Path         Type        Description
+# ----         ----        -----------
+# token/       token       token based credentials
+# userpass/    userpass    n/a
+
+echo -n 'get enabled auth methods: '
+if output="$(vault auth list -address="${vault_address}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: does this scale for
+# arbitrary numbers of auth methods ?
+auth_lines="$(tail -n +3 <<< "${output}")"
+auth_methods=''
+
+OLD_IFS="${IFS}" && IFS=$'\n'
+
+for auth_line in ${auth_lines}
+do
+    # TODO: align code, do this with array
+    auth_meth="$("${sed}" -e 's|.*  \([a-z]\+\)  .*|\1|g' <<< "${auth_line}")"
+    auth_methods+="${auth_meth} "
+done
+
+IFS="${OLD_IFS}"
+
+auth_methods="${auth_methods%% }"
+
+echo -n 'enable userpass auth method: '
+
+if [[ "${auth_methods}" == *userpass* ]]
+then
+    echo 'already enabled'
+else
+    if output="$(vault auth enable -address="${vault_address}" userpass 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+
+for user_name in ${user_names}
+do
+    echo "user ${user_name}:"
+
+    path_to_conf_file="${path_to_sec_loc}/${users_folder}/${user_name}.json"
+
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '  user configuration file does not exist; not uploaded:'
+        echo "  ${path_to_conf_file}"
+        continue
+    fi
+
+    # TODO: error handling, e.g. file does not exist
+    password="$(jq -r '.password' "${path_to_conf_file}")"
+    if [ "${password}" = "${placeholder}" ]
+    then
+        echo '  user password has not been set; not uploaded'
+        continue
+    fi
+
+    # TODO: vault error message is garbled when file does not exist, e.g.
+    # ERROR
+    # Warning: Couldn't read data from file
+    # Warning: "/Volumes/VAULT/Corporate/DesmoDyne/Secrets/vault.desmodyne.c
+    # Warning: om/users/test.json", this makes an empty POST.
+    # {"errors":["missing password"]}
+
+    echo -n "  upload user configuration: "
+
+    # TODO: test if user exists and output 'overwriting' message
+    if output="$(curl --data  @"${path_to_conf_file}"         \
+                      --header "X-Vault-Token: ${root_token}" \
+                      --request POST                          \
+                      --show-error                            \
+                      --silent                                \
+                  "${vault_address}/v1/auth/userpass/users/${user_name}" 2>&1)"
+    then
+        # if successful, curl returns 0 and output is empty
+        if [ -z "${output}" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            # sample output:
+            # {"errors":["1 error occurred:\n\n* permission denied"]}
+            if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
+            then
+                echo "${errors}"
+            else
+                echo "${output}"
+            fi
+            exit 1
+        fi
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+done
+
+
+echo
+echo 'HashiCorp Vault UserPass authentication setup complete'
+echo

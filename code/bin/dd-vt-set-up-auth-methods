@@ -1,0 +1,414 @@
+#!/usr/bin/env bash
+
+# dd-vt-set-up-auth-methods
+#
+# set up vault authentication method
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2019-06-10
+
+
+# https://www.vaultproject.io/docs/auth/index.html
+# https://www.vaultproject.io/api/auth/index.html
+# https://learn.hashicorp.com/vault/getting-started/authentication#auth-methods
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Set up HashiCorp Vault authentication methods'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# shellcheck disable=SC2034
+attrs=(auth_methods key_file_name path_to_sec_loc vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+# define functions: http://stackoverflow.com/a/6212408
+
+# TODO: doc function purpose, parameters, return values, etc.
+# TODO: use function arguments instead of global variables
+
+function set_up_approle
+{
+    if [ "${method_conf}" = 'null' ]
+    then
+        echo '      no approle auth method configuration; skip setup'
+        return 0
+    else
+        roles_conf="$(jq '.roles' <<< "${method_conf}")"
+    fi
+
+    if [ "${roles_conf}" = 'null' ]
+    then
+        echo '      no approle roles configured; skip setup'
+        return 0
+    else
+        role_names="$(jq -r '.[].role_name' <<< "${roles_conf}")"
+    fi
+
+    # jq expression to test vault REST API response for errors;
+    # returns the (multi-line) error string or null if no error
+    # TODO: refactor this to elsewhere to use it after every curl call
+    # https://stackoverflow.com/a/33059058
+    # https://stackoverflow.com/a/36330650
+    # https://stackoverflow.com/a/38337572
+    # https://github.com/stedolan/jq/issues/354#issuecomment-43102213
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+    # NOTE: the vault CLI doesn't seem to support listing roles
+    # https://www.vaultproject.io/api/auth/approle/index.html#list-roles
+    # shellcheck disable=SC2154
+    full_url="${vault_address}/v1/auth/approle/role"
+
+    echo -n '      get existing approle roles: '
+    if output="$(curl --header "X-Vault-Token: ${root_token}"       \
+                      --request LIST                                \
+                      --show-error                                  \
+                      --silent                                      \
+                      "${full_url}" 2>&1)"
+    then
+        # NOTE: the curl call might succeed, but return json error;
+        # compound statements do not conform with convention, but
+        # this jq call should always succeed, so no error handling
+        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        then
+            echo 'OK'
+            exist_roles_json="${output}"
+        else
+            echo 'ERROR'
+            # TODO: use awk to add multi-line indent ?
+            echo "${output}"
+            return 1
+        fi
+    else
+        echo 'ERROR'
+        echo "        ${output}"
+        return 1
+    fi
+
+    # sample response with no existing roles:
+    # {
+    #   "errors": []
+    # }
+    #
+    # sample response with one existing role:
+    # {
+    #   "request_id": "e445cdb2-880d-b581-a945-1cfb0ca868f8",
+    #   "lease_id": "",
+    #   "renewable": false,
+    #   "lease_duration": 0,
+    #   "data": {
+    #     "keys": [
+    #       "gitlab-registry-reader"
+    #     ]
+    #   },
+    #   "wrap_info": null,
+    #   "warnings": null,
+    #   "auth": null
+    # }
+
+    jq_expr='if .data.keys then .data.keys[] else empty end'
+    exist_role_names="$(jq -r "${jq_expr}" <<< "${exist_roles_json}")"
+
+    echo '      process approle role configurations:'
+
+    for role_name in ${role_names}
+    do
+        echo -n "        create role ${role_name}: "
+
+        # NOTE: the vault CLI supports creating roles, but requires translating
+        # a possibly large number of arguments from json into cmd line params:
+        # https://www.vaultproject.io/api/auth/ ...
+        #  ... approle/index.html#create-update-approle
+        full_url="${vault_address}/v1/auth/approle/role/${role_name}"
+
+        # jq expression to get conf for current role
+        jq_expr=".[] | select(.role_name == \"${role_name}\")"
+        req_data="$(jq "${jq_expr}" <<< "${roles_conf}")"
+
+        # NOTE: this assumes that there is no role
+        # whose name is a substring of the name of another
+        if [[ "${exist_role_names}" == *"${role_name}"* ]]
+        then
+            echo 'already exists'
+        else
+            if output="$(curl --data "${req_data}"                          \
+                              --header "X-Vault-Token: ${root_token}"       \
+                              --request POST                                \
+                              --show-error                                  \
+                              --silent                                      \
+                              "${full_url}" 2>&1)"
+            then
+                if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+                then
+                    echo 'OK'
+                else
+                    echo 'ERROR'
+                    echo "          ${output}"
+                    continue
+                fi
+            else
+                # NOTE: a failed curl call indicates a larger issue than a
+                # json error response, so continue above, but return here
+                echo 'ERROR'
+                echo "          ${output}"
+                return 1
+            fi
+        fi
+    done
+}
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# set up authentication methods
+
+# TODO: this does not support enabling an auth method at a non-default path
+
+# shellcheck disable=SC2154
+if [ "${auth_methods}" = 'null' ]
+then
+    echo 'no auth methods configured; skip setup'
+    echo
+    echo 'HashiCorp Vault authentication method setup complete'
+    echo
+    exit
+else
+    auth_meth_names="$(jq -r 'keys[]' <<< "${auth_methods}")"
+fi
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+# https://www.vaultproject.io/docs/commands/login.html
+echo -n 'log into vault: '
+if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# https://www.vaultproject.io/docs/commands/auth/list.html
+echo -n 'get enabled auth methods: '
+if output="$(vault auth list -address="${vault_address}"  -format=json 2>&1)"
+then
+    echo 'OK'
+    enabled_auth_meth_json="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# sample output with default 'token' and three extra auth methods enabled:
+# {
+#   "approle/": {
+#     "uuid": "8445ca66-9a28-3718-499a-52e25fc5abd5",
+#     "type": "approle",
+#     "description": "",
+#     "accessor": "auth_approle_5c80e088",
+#     "config": {
+#       "default_lease_ttl": 0,
+#       "max_lease_ttl": 0,
+#       "force_no_cache": false,
+#       "token_type": "default-service"
+#     },
+#     "options": {},
+#     "local": false,
+#     "seal_wrap": false
+#   },
+#   "github/": {
+#     "uuid": "d70573eb-29cb-b9d9-77cd-f039b520050f",
+#     "type": "github",
+#     "description": "",
+#     "accessor": "auth_github_ea7a6db8",
+#     "config": {
+#       "default_lease_ttl": 0,
+#       "max_lease_ttl": 0,
+#       "force_no_cache": false,
+#       "token_type": "default-service"
+#     },
+#     "options": {},
+#     "local": false,
+#     "seal_wrap": false
+#   },
+#   "token/": {
+#     "uuid": "a226c218-c9bf-bbd8-ddac-43f86d0b56e9",
+#     "type": "token",
+#     "description": "token based credentials",
+#     "accessor": "auth_token_f707d51c",
+#     "config": {
+#       "default_lease_ttl": 0,
+#       "max_lease_ttl": 0,
+#       "force_no_cache": false,
+#       "token_type": "default-service"
+#     },
+#     "options": null,
+#     "local": false,
+#     "seal_wrap": false
+#   },
+#   "userpass/": {
+#     "uuid": "f9814ad7-db8e-4290-9165-efc2f74ca00b",
+#     "type": "userpass",
+#     "description": "",
+#     "accessor": "auth_userpass_eaacbe24",
+#     "config": {
+#       "default_lease_ttl": 0,
+#       "max_lease_ttl": 0,
+#       "force_no_cache": false,
+#       "token_type": "default-service"
+#     },
+#     "options": {},
+#     "local": false,
+#     "seal_wrap": false
+#   }
+# }
+
+enabled_auth_methods="$(jq -r '.[].type' <<< "${enabled_auth_meth_json}")"
+
+echo 'process auth method configurations:'
+
+for auth_meth_name in ${auth_meth_names}
+do
+    echo "  ${auth_meth_name}:"
+
+    method_conf="$(jq ".${auth_meth_name}" <<< "${auth_methods}")"
+
+    case "${auth_meth_name}" in
+        approle)
+            echo -n '    enable auth method: '
+
+            # NOTE: this assumes that there is no auth method
+            # whose name is a substring of the name of another
+            if [[ "${enabled_auth_methods}" == *"${auth_meth_name}"* ]]
+            then
+                echo 'already enabled'
+            else
+                if output="$(vault auth enable -address="${vault_address}" \
+                                               "${auth_meth_name}" 2>&1)"
+                then
+                    echo 'OK'
+                else
+                    echo 'ERROR'
+                    echo "      ${output}"
+                    exit 1
+                fi
+            fi
+
+            echo '    set up auth method: '
+            set_up_approle
+            ;;
+        *)
+            echo "    ERROR: auth method ${auth_meth_name} is not supported"
+            ;;
+    esac
+done
+
+
+echo
+echo 'HashiCorp Vault authentication method setup complete'
+echo

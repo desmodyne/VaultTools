@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+
+# build-basic-images
+#
+# build Docker container images defined by only a Dockerfile
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2017-05-26
+
+
+# NOTE: on OS X, install required packages using e.g.
+#   brew install bash coreutils jq vault yq
+#   brew cask install docker
+# https://brew.sh/
+# https://apple.stackexchange.com/a/69332
+# https://stedolan.github.io/jq
+# https://www.vaultproject.io/
+# https://mikefarah.github.io/yq
+# https://docs.docker.com/docker-for-mac/install
+# https://www.docker.com/products/docker-desktop
+
+
+# TODO: error handling around using jq and assuming paths being available
+# TODO: review / align script log output, especially during error handling
+
+
+echo
+echo 'build basic Docker container images'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# NOTE: I would have thought that these variables are already defined if this
+# script is called as a subscript by build; that does not seem to be the case
+
+# path from this script to project root
+path_to_proj_root='../..'
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute, canonical path to project root
+# NOTE: realpath fails if path does not exist
+path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+# path to BashLib library file, relative to project root
+path_to_bashlib='ext/BashLib/code/lib/bashlib.sh'
+
+# absolute path to library
+path_to_library="${path_to_proj_root}/${path_to_bashlib}"
+
+# TODO: shellcheck reports these to be unused
+# https://github.com/koalaman/shellcheck/wiki/SC2034
+
+# array with alphabetical list of tools called by this script
+# NOTE: too late to test for realpath, already used above
+# shellcheck disable=SC2034
+req_tools=('docker' 'jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+# TODO: get these from config file ?
+
+# secrets file template
+read -r -d '' secrets_file_tmpl <<'EOT'
+role_id:%s
+secret_id:%s
+EOT
+
+# path to file with secrets, relative to Docker folder
+path_to_secrets_file='secrets'
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# NOTE: I just assumed BashLib would already be available here if this script
+# is called as subscript to build, as build sources it, but this is not true
+
+# NOTE: this only tests if library can be sourced;
+# functions are only defined in "$(...)" subshell,
+# so a second source for use in here is required
+# https://github.com/koalaman/shellcheck/wiki/SC1090
+# shellcheck disable=SC1090
+if ! output="$(source "${path_to_library}" 2>&1)"
+then
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${path_to_library}"
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+if ! proc_cmd_line_args "${@}"       ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# NOTE: see config file for parameter documentation
+# TODO: refactor this out to BashLib function
+# TODO: error handling, e.g. check if json / yaml keys are available
+# TODO: get this to work with latest yq 2.x
+
+# NOTE: this essentially converts YAML to JSON
+# conf_file is defined by proc_cmd_line_args
+# https://github.com/koalaman/shellcheck/wiki/SC2154
+# shellcheck disable=SC2154
+conf="$(yq r -j "${conf_file}")"
+
+# https://unix.stackexchange.com/a/76407
+cont_image_data="$(jq -r '.basic_images' <<< "${conf}")"
+vault_addr="$(     jq -r '.vault_addr'   <<< "${conf}")"
+
+
+# -----------------------------------------------------------------------------
+# build basic Docker images
+
+
+if ! pushd "${path_to_proj_root}" > /dev/null
+then
+    echo "Failed to pushd to project root ${path_to_proj_root}"
+    exit
+fi
+
+
+echo
+
+if ! image_names="$(jq -r 'keys[]' <<< "${cont_image_data}" | sort)"
+then
+    exit 1
+fi
+
+for image_name in ${image_names}
+do
+    echo "container image name: ${image_name}"
+    echo
+
+    # NOTE: image name might contain dashes, so need escaped quotes
+    if ! path_to_dockerfile="$(jq -r ".\"${image_name}\".path_to_dockerfile" \
+          <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if [ ! -f "${path_to_dockerfile}" ]
+    then
+        echo 'Failed to find Dockerfile at'
+        echo "  $(realpath "${path_to_dockerfile}")"
+        exit 1
+    fi
+
+    echo "build ${image_name} with"
+    echo "  $(realpath "${path_to_dockerfile}"):"
+    echo
+
+    # TODO: continue or exit ?
+    # TODO: review error handling / output / exit code
+
+    if ! tag="$(jq -r ".\"${image_name}\".image_tag" <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if ! vault_auth_path="$(jq -r ".\"${image_name}\".vault_auth_path" \
+             <<< "${cont_image_data}")"
+    then
+        exit 1
+    fi
+
+    if [ "${vault_auth_path}" != 'null' ]
+    then
+        # TODO: these require that the host this script runs on
+        #       is logged into vault with adequate permissions
+
+        # TODO: use -format for json or yaml output format ?
+        if output="$(vault  read                      \
+                           -address="${vault_addr}"   \
+                            "${vault_auth_path}/role-id" 2>&1)"
+        then
+            vault_response="${output}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(grep 'role_id ' <<< "${vault_response}" 2>&1)"
+        then
+            role_id="${output##* }"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(vault  write                     \
+                           -address="${vault_addr}"   \
+                           -force                     \
+                            "${vault_auth_path}/secret-id" 2>&1)"
+        then
+            vault_response="${output}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        if output="$(grep 'secret_id ' <<< "${vault_response}" 2>&1)"
+        then
+            secret_id="${output##* }"
+        else
+            echo "${output}"
+            exit 1
+        fi
+
+        # TODO: fix this
+
+        if output="$(printf "${secrets_file_tmpl}" \
+                            "${role_id}" "${secret_id}" 2>&1)"
+        then
+            echo "${output}" > "${image_path}/${path_to_secrets_file}"
+        else
+            echo "${output}"
+            exit 1
+        fi
+    fi
+
+    if ! docker build --file "${path_to_dockerfile}" \
+                      --tag "${image_name}:${tag}" .
+    then
+        exit 1
+    fi
+
+    if [ -e "${image_path}/${path_to_secrets_file}" ]
+    then
+        rm "${image_path}/${path_to_secrets_file}"
+    fi
+
+    echo
+    echo "container image ${image_name} complete"
+    echo
+done
+
+
+if ! popd > /dev/null
+then
+    echo "Failed to popd from project root ${path_to_proj_root}"
+    exit
+fi
+
+
+echo 'basic Docker container images build complete'
+echo

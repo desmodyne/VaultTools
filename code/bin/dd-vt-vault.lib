@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+
+# dd-vt-vault.lib
+#
+# functions for HashiCorp Vault shell scripts
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-06-29
+
+
+# TODO: review #!/usr/bin/env bash
+# TODO: do not use global variables, but function parameters
+# TODO: document parameters and return values
+# TODO: really set variables in here and use them elsewhere ?
+# TODO: review function names, most of them do more than the name suggests
+# TODO: use named parameters ? https://stackoverflow.com/a/30033822
+# TODO: add code location indicator to log messages ?
+# TODO: how to check if commands used in here are available ?
+
+
+# define functions: http://stackoverflow.com/a/6212408
+
+
+# -----------------------------------------------------------------------------
+function get_vault_status
+{
+    echo -n 'get vault status: '
+
+    # NOTE: from vault status --help:
+    #   The exit code reflects the seal status:
+    #       - 0 - unsealed
+    #       - 1 - error
+    #       - 2 - sealed
+    #
+    # return codes of this function:
+    #       - 0 - unsealed
+    #       - 1 - error
+    #       - 2 - sealed
+    #       - 3 - not initialized
+
+    # sample output for uninitialized vault:
+    #   alexa:~ ssc$ vault status
+    #   {
+    #     "type": "shamir",
+    #     "initialized": false,
+    #     "sealed": true,
+    #     "t": 0,
+    #     "n": 0,
+    #     "progress": 0,
+    #     "nonce": "",
+    #     "version": "",
+    #     "migration": false,
+    #     "recovery_seal": false
+    #   }
+
+    # shellcheck disable=SC2154
+    output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+    res=$?
+
+    case "${res}" in
+
+        0)  echo 'OK'
+            return 0
+            ;;
+
+        1)  echo 'ERROR'
+            echo "${output}"
+            return 1
+            ;;
+
+        2)  echo 'OK'
+
+            if output="$(jq '.initialized' <<< "${output}" 2>&1)"
+            then
+                initialized="${output}"
+            else
+                echo 'failed to parse vault status json response:'
+                echo "${output}"
+                return 1
+            fi
+
+            if [ "${initialized}" = true ]
+            then
+                return 2
+            else
+                return 3
+            fi
+            ;;
+
+        *)  echo 'ERROR'
+            echo "unexpected vault status exit code ${res}"
+            if [ -n "${output}" ]; then echo "${output}"; fi
+            return 1
+            ;;
+
+    esac
+}
+
+
+# -----------------------------------------------------------------------------
+function validate_config_settings
+{
+    echo -n 'validate configuration settings: '
+
+    # TODO: verify path_to_sec_loc is an absolute path ?
+    # TODO: resolve symbolic links into real path ?
+
+    # shellcheck disable=SC2154
+    if [ -e "${path_to_sec_loc}" ]
+    then
+        if [ -d "${path_to_sec_loc}" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo 'path exists, but is not a directory:'
+            echo "${path_to_sec_loc}"
+            return 1
+        fi
+    else
+        # split paths into its components
+        # https://askubuntu.com/a/600252
+        # TODO: this fails with whitespace in path
+        # shellcheck disable=SC2154
+        comps="$("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")"
+
+        # turn path components into array
+        # https://stackoverflow.com/a/13402368
+        # NOTE: word splitting is intended here
+        # shellcheck disable=SC2206
+        array=(${comps})
+
+        # NOTE: alternate / shorter approach:
+        # https://github.com/koalaman/shellcheck/wiki/SC2207
+        # mapfile -t array < \
+        #     <("${xargs}" -n 1 -d '/' <<< "${path_to_sec_loc}" | "${xargs}")
+
+        # if at least the first two path components exist,
+        # they are considered a solid base for the rest
+        # TODO: this is specific to local secure location
+        # TODO: this assumes at least two comps in path
+        if [ -d "/${array[0]}/${array[1]}" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo 'path to secure location is not mounted:'
+            echo "${path_to_sec_loc}"
+            return 1
+        fi
+    fi
+}
+
+
+# it is a critical aspect of the overall PKI concept that the secure location
+# SSH keys and generation log files are saved to is under version control;
+# verify and abort script with a warning to the user if this is not the case
+# NOTE: secure location is not necessarily location at repo root; checking for
+# "${path_to_sec_loc}/.git does not help: https://stackoverflow.com/a/2180367
+
+# -----------------------------------------------------------------------------
+function validate_secure_location
+{
+    echo -n 'verify secure location is a valid folder: '
+
+    if [ ! -d "${path_to_sec_loc}" ]
+    then
+        echo 'ERROR'
+        echo "${path_to_sec_loc}: No such directory"
+        return 1
+    fi
+
+    if [ ! -r "${path_to_sec_loc}" ]
+    then
+        echo 'ERROR'
+        echo "${path_to_sec_loc}: Folder is not readable"
+        return 1
+    fi
+
+    echo 'OK'
+
+    echo -n 'verify secure location is under version control: '
+
+    if output="$(git -C "${path_to_sec_loc}" rev-parse --git-dir 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        return 1
+    fi
+
+    # if the repo is not clean to prevent overwriting changes
+    echo -n 'verify secure location repository status: '
+
+    # https://unix.stackexchange.com/a/155077
+    if output="$(git -C "${path_to_sec_loc}" status --porcelain 2>&1)"
+    then
+
+        if [ -z "${output}" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo 'repository has uncommitted changes:'
+            echo "${output}"
+            return 1
+        fi
+    else
+        echo 'ERROR'
+        echo "${output}"
+        return 1
+    fi
+}

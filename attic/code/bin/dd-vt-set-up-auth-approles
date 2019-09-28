@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+
+# dd-vt-set-up-auth-approles
+#
+# set up AppRole authentication method
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-06-17
+
+
+# https://www.vaultproject.io/api/auth/approle/index.html#role_name
+# https://www.vaultproject.io/docs/auth/approle.html
+# https://www.vaultproject.io/guides/identity/authentication.html#steps  <-- !!!
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Set up HashiCorp Vault AppRole authentication'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# conf_file is defined by get_conf_file_arg
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+for attr in key_file_name path_to_sec_loc secrets vault_address
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+# TODO: review jq exprs to make these scalable beyond one path
+
+# json data structure with secrets for each service
+serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets_json}")"
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+# NOTE: service name must not contain any paths; in fact, the range of
+# allowed characters is heavily restricted; for details, see output of
+#   vault path-help [-address <address>] auth/approle
+#     ...
+#   ^role/(?P<role_name>\w(([\w-.]+)?\w)?)$
+#   Register an role with the backend.
+#     ...
+#
+# Go regex is massively different from GNU grep regex:
+#   https://golang.org/pkg/regexp/syntax
+#   https://www.gnu.org/software/findutils/manual/ ...
+#    ... html_node/find_html/grep-regular-expression-syntax.html
+#   https://www.gnu.org/software/grep/manual/ ...
+#    ... html_node/Character-Classes-and-Bracket-Expressions.html
+# for example, in Go, \w matches word characters [0-9A-Za-z_],
+# in GNU grep, \w matches a character within a word
+#
+# GNU regex corresponding to Go Regex from path-help output above
+service_name_regex='^[0-9A-Za-z_][0-9A-Za-z_.]*[0-9A-Za-z_]$'
+
+# sed -E -e statements applied to recover from invalid service names
+read -r -d '' recover_cmds <<'EOT'
+s|^[^0-9A-Za-z_]|_|g
+s|[^0-9A-Za-z_]$|_|g
+s|[^0-9A-Za-z_.]|_|g
+EOT
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# set up approle authentication
+
+if [ -z "${serv_secrets}" ]
+then
+    echo 'no services configured; skip setting up approle authentication'
+    echo
+    echo 'HashiCorp Vault AppRole authentication setup complete'
+    echo
+    exit
+else
+    serv_names="$(jq -r '.sec_confs[].path' <<< "${serv_secrets}" | xargs)"
+fi
+
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+echo -n 'log into vault: '
+if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# https://www.vaultproject.io/api/system/auth.html
+
+# NOTE: see also dd-vt-set-up-auth-userpass
+
+echo -n 'get enabled auth methods: '
+if output="$(vault auth list -address="${vault_address}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+auth_lines="$(tail -n +3 <<< "${output}")"
+auth_methods=''
+
+OLD_IFS="${IFS}" && IFS=$'\n'
+
+for auth_line in ${auth_lines}
+do
+    # TODO: align code, do this with array
+    auth_meth="$("${sed}" -e 's|.*  \([a-z]\+\)  .*|\1|g' <<< "${auth_line}")"
+    auth_methods+="${auth_meth} "
+done
+
+IFS="${OLD_IFS}"
+
+auth_methods="${auth_methods%% }"
+
+echo -n 'enable approle auth method: '
+
+if [[ "${auth_methods}" == *approle* ]]
+then
+    echo 'already enabled'
+else
+    if output="$(vault auth enable -address="${vault_address}" approle 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+
+for serv_name in ${serv_names}
+do
+    echo "service ${serv_name}: "
+
+    echo -n "  verify service name ${serv_name}: "
+
+    policy_name="${serv_name}"
+
+    if "${grep}" -q "${service_name_regex}" <<< "${serv_name}"
+    then
+        echo 'OK'
+
+    else
+        echo 'FAIL'
+
+        echo '  attempt to modify service name:'
+        mod_name="${serv_name}"
+        rec_success=false
+
+        for recover_cmd in ${recover_cmds}
+        do
+            mod_name="$("${sed}" -E -e "${recover_cmd}" <<< "${mod_name}")"
+
+            # no point in re-testing unchanged name
+            if [ "${mod_name}" = "${serv_name}" ]
+            then
+                continue
+            fi
+
+            echo -n "    verify modified service name ${mod_name}: "
+            if "${grep}" -q "${service_name_regex}" <<< "${mod_name}"
+            then
+                echo 'OK'
+                rec_success=true
+                break
+            else
+                echo 'FAIL'
+            fi
+        done
+
+        if [ "${rec_success}" = true ]
+        then
+            serv_name="${mod_name}"
+        else
+            echo 'failed to modify invalid service name'
+            continue
+        fi
+    fi
+
+    echo -n "  add approle role: "
+
+    full_url="${vault_address}/v1/auth/approle/role/${serv_name}"
+
+    # TODO: test if user exists and output 'overwriting' message
+    if output="$(curl --data "{\"policies\": \"${policy_name}\"}"   \
+                      --header "X-Vault-Token: ${root_token}"       \
+                      --request POST                                \
+                      --show-error                                  \
+                      --silent                                      \
+                      "${full_url}" 2>&1)"
+    then
+        # if successful, curl returns 0 and output is empty
+        if [ -z "${output}" ]
+        then
+            echo 'OK'
+            echo "  role created: ${full_url}"
+        else
+            echo 'ERROR'
+            # sample output:
+            # {"errors":["1 error occurred:\n\n* permission denied"]}
+            if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
+            then
+                echo "${errors}"
+            else
+                echo "${output}"
+            fi
+            exit 1
+        fi
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+done
+
+
+echo
+echo 'HashiCorp Vault AppRole authentication setup complete'
+echo

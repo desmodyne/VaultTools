@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+
+# dd-vt-create-users-files
+#
+# generate configuration files for vault users in secure location
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-20
+
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Create HashiCorp Vault user files'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('jq' 'j2' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+echo -n 'Load script configuration file: '
+# conf_file is defined by get_conf_file_arg
+# shellcheck disable=SC2154
+if output="$(yq read "${conf_file}" --tojson 2>&1)"
+then
+    echo 'OK'
+    config="${output}"
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'Extract script configuration attributes: '
+for attr in path_to_sec_loc path_to_tmpl_folder placeholder users users_folder
+do
+    # https://unix.stackexchange.com/a/68349
+    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
+    # https://unix.stackexchange.com/a/41418
+    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
+    then
+        echo 'ERROR'
+        echo "Failed to get ${attr} attribute from configuration"
+        exit 1
+    fi
+done
+echo 'OK'
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to folder with user configuration files
+path_to_users_folder="${path_to_sec_loc}/${users_folder}"
+
+# TODO: get this from conf
+
+# name of template file
+tmpl_file_name='user.json.j2'
+
+
+# -----------------------------------------------------------------------------
+# create users configuration file
+
+if [ "${users}" = 'null' ]
+then
+    echo 'no users configured; skip creating user files'
+    echo
+    echo 'HashiCorp Vault user file creation complete'
+    echo
+    exit
+else
+    user_names="$(jq -r '.[].name' <<< "${users}" | xargs)"
+fi
+
+if [ ! -d "${path_to_users_folder}" ]
+then
+    echo -n 'create users configuration folder: '
+    if output="$(mkdir -p "${path_to_users_folder}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+# TODO: continue or exit ?
+
+for user_name in ${user_names}
+do
+    echo "user ${user_name}:"
+
+    policies="$(jq -r ".[] | select(.name == \"${user_name}\").policies[]" \
+                  <<< "${users}" | xargs | sed -e 's| |,|g')"
+
+    # append policy for regular users
+    if [ "${user_name}" != 'root' ]
+    then
+        policies+=",${user_name}"
+    fi
+
+    path_to_conf_file="${path_to_users_folder}/${user_name}.json"
+    path_to_temp_file="${path_to_users_folder}/${user_name}.json.temp"
+
+    # attempt to get password from existing file
+    if [ -f "${path_to_conf_file}" ]
+    then
+        if output="$(jq -r '.password' "${path_to_conf_file}" 2>&1)"
+        then
+            existing_password="${output}"
+        fi
+    fi
+
+    echo -n '  create user configuration file: '
+
+    # j2 --format env requires export
+    # if an existing password was found, use it; otherwise, use placeholder
+    # https://www.tldp.org/LDP/abs/html/parameter-substitution.html
+    export password="${existing_password:-$placeholder}"
+    export policies="${policies}"
+
+    # TODO: this requires j2cli pip package
+    if output="$(j2 --format env \
+                    "${path_to_tmpl_folder}/${tmpl_file_name}" 2>&1)"
+    then
+        echo 'OK'
+        echo "${output}" > "${path_to_temp_file}"
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+    export password=
+    export policies=
+
+    # move temp file to conf file
+    if ! output="$(mv "${path_to_temp_file}" "${path_to_conf_file}" 2>&1)"
+    then
+        echo "  ${output}"
+        exit 1
+    fi
+
+    echo "  file created: ${path_to_conf_file}"
+done
+
+
+echo
+echo 'HashiCorp Vault user file creation complete'
+echo

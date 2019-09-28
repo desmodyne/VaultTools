@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+
+# dd-vt-init-vault
+#
+# initialize a vault and store key and token data in secure location
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-20
+
+
+# https://www.vaultproject.io/api/system/init.html
+
+
+echo
+echo 'Initialize HashiCorp Vault instance'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'git' 'jq' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# shellcheck disable=SC2034
+attrs=(key_file_name path_to_sec_loc
+       secret_shares secret_threshold vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters, cont.
+
+# TODO: use template file instead of code ?
+# template for http call json data
+read -r -d '' json_data_tmpl <<'EOT'
+{
+    "secret_shares": %s,
+    "secret_threshold": %s
+}
+EOT
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  # shellcheck disable=SC2154
+        echo "  vault at ${vault_address} is already initialized - and unsealed"
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  echo "  vault at ${vault_address} is already initialized - and sealed"
+        ;;
+    3)  echo "  vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 3 ]
+then
+    echo
+    echo 'HashiCorp Vault instance initialization complete'
+    echo
+    if [ "${res}" = 2 ]
+    then
+        exit 0
+    else
+        exit "${res}"
+    fi
+fi
+
+
+# -----------------------------------------------------------------------------
+# init vault
+
+if [ ! -d "${path_to_sec_loc}" ]
+then
+    echo -n 'create folder at secure location: '
+    if output="$(mkdir -p "${path_to_sec_loc}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+# render template
+# shellcheck disable=SC2059,SC2154
+json_data="$(printf "${json_data_tmpl}" "${secret_shares}" \
+                                        "${secret_threshold}")"
+
+echo -n 'initialize vault: '
+if output="$(curl --data "${json_data}" \
+                  --request PUT         \
+                  --show-error          \
+                  --silent              \
+                  "${vault_address}/v1/sys/init" 2>&1)"
+then
+    # if successful, curl returns 0 and
+    # output is json with keys and token
+    echo 'OK'
+    response="${output}"
+
+    if output="$(jq '.' <<< "${response}" 2>&1)"
+    then
+        # TODO: this should have been caught much earlier
+        # sample output:
+        # {"errors":["Vault is already initialized"]}
+        if errors="$(jq -r '.errors[]' <<< "${response}" 2>&1)"
+        then
+            echo "${errors}"
+        else
+            echo "${output}" > "${path_to_key_file}"
+        fi
+    else
+        echo 'ERROR'
+        # sample output:
+        # {"errors":["1 error occurred:\n\n* permission denied"]}
+        if errors="$(jq -r '.errors[]' <<< "${response}" 2>&1)"
+        then
+            echo "${errors}"
+        else
+            echo "${output}"
+        fi
+        exit 1
+    fi
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: path_to_sec_loc is not the git repo root folder
+
+echo -n 'stage init response file: '
+if output="$(git -C "${path_to_sec_loc}" add "${path_to_key_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: add vault UUID and public / private info
+git_msg='initialize vault'
+
+echo -n 'commit init response file: '
+# shellcheck disable=SC2154
+if output="$(git -C "${path_to_sec_loc}" \
+                 commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'HashiCorp Vault instance initialization complete'
+echo

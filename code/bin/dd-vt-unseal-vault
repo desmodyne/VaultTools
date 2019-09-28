@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+
+# dd-vt-unseal-vault
+#
+# open vault so users can log in and read / write secrets
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-19
+
+
+# https://www.vaultproject.io/api/system/unseal.html
+
+# NOTE: see also dd-vt-init-vault
+# TODO: move this to formal documentation of how these scripts work
+# NOTE: this script requires key information in json format;
+# this information is displayed by a vault only once, when it is initialized
+# and - as per convention - is stored as init.json in a secure location
+
+
+echo
+echo 'Unseal HashiCorp Vault instance'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'git' 'jq' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# shellcheck disable=SC2034
+attrs=(info_file_name key_file_name path_to_sec_loc vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+# full path to file with vault UUID and status info
+# shellcheck disable=SC2154
+path_to_info_file="${path_to_sec_loc}/${info_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  # shellcheck disable=SC2154
+        echo "vault at ${vault_address} is already unsealed"
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  #
+        ;;
+    3)  echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 2 ]
+then
+    echo
+    echo 'HashiCorp Vault instance unseal complete'
+    echo
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# unseal vault
+
+echo 'unseal vault:'
+
+number_of_keys="$(jq '.keys | length' "${path_to_key_file}")"
+
+# bash brace expansion does not support variables
+for key_index in $(seq 0 $((number_of_keys - 1)))
+do
+    echo -n "  send key #${key_index}: "
+    key="$(jq -r ".keys[${key_index}]" "${path_to_key_file}")"
+    if output="$(curl --data   "{\"key\": \"${key}\"}"  \
+                      --request PUT                     \
+                      --show-error                      \
+                      --silent                          \
+                      "${vault_address}/v1/sys/unseal" 2>&1)"
+    then
+        # if successful, curl returns 0 and
+        # output is json with unseal status;
+        # otherwise, curl also returns 0 and
+        # error message is returned in response
+
+        # sample success response:
+        # {
+        #   "type": "shamir",
+        #   "sealed": true,
+        #   "t": 3,
+        #   "n": 5,
+        #   "progress": 1,
+        #   "nonce": "60707b37-dc3c-a3f1-720c-d9475ff12a65",
+        #   "version": "0.9.3"
+        # }
+        if progress="$(jq -r '.progress' <<< "${output}" 2>&1)" && \
+           total="$(   jq -r '.t'        <<< "${output}" 2>&1)" && \
+           [ "${progress}" != 'null' ] && [ "${total}" != 'null' ]
+        then
+            echo "OK - ${progress} / ${total}"
+
+        # sample error response:
+        # { "errors" : [ "1 error occurred:\n\n* permission denied" ] }
+        else
+            if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
+            then
+                echo 'ERROR'
+                echo "${errors}"
+            else
+                echo 'ERROR'
+                echo "${output}"
+            fi
+            exit 1
+        fi
+    else
+        echo 'ERROR'
+        echo "${output}"
+        exit 1
+    fi
+
+    sealed="$(jq '.sealed' <<< "${output}")"
+    if [ "${sealed}" = 'false' ]
+    then
+        break
+    fi
+done
+
+if [ "${sealed}" = 'true' ]
+then
+    echo 'failed to unsealed vault'
+    exit 1
+fi
+
+# NOTE: the vault UUID is only available after unsealing the vault
+# NOTE: this somewhat duplicates dd-vt-vault.lib > get_vault_status,
+# but here, the actual output is needed and not only the status code
+echo -n 'get vault status: '
+if output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+then
+    echo 'OK'
+    vault_status="${output}"
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+echo -n 'save vault status to info file: '
+# shellcheck disable=SC2116
+if output="$(echo "${vault_status}" > "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: path_to_sec_loc is not the git repo root folder
+
+echo -n 'stage vault info file: '
+if output="$(git -C "${path_to_sec_loc}" add "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: add vault UUID and public / private info
+git_msg='add vault status file'
+
+echo -n 'commit vault info file: '
+# shellcheck disable=SC2154
+if output="$(git -C "${path_to_sec_loc}" \
+                 commit -m "${git_msg}" "${path_to_info_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'HashiCorp Vault instance unseal complete'
+echo

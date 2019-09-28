@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+
+# dd-vt-configure-vault
+#
+# configure the vault server
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2018-02-21
+
+
+# https://www.vaultproject.io/docs/audit/file.html
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Configure HashiCorp Vault instance'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+# NOTE: see config file for parameter documentation
+
+echo
+
+# shellcheck disable=SC2034
+attrs=(key_file_name path_to_log_file path_to_sec_loc vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# conf_file is set by get_conf_file_arg
+# https://github.com/koalaman/shellcheck/wiki/SC2154
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+# TODO: really do these both in every sub script ?
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  #
+        ;;
+    3)  # shellcheck disable=SC2154
+        echo "vault at ${vault_address} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# configure vault
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+echo -n 'log into vault: '
+if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+# TODO: just like in set-up-users,
+# any combination of this fails with
+# flag provided but not defined: -format
+# vault audit list -detailed -format json
+
+echo -n 'get audit devices: '
+if output="$(vault audit list -address="${vault_address}" -detailed 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "  ${output}"
+    # TODO: "No audit devices are enabled." is not an error, is it ?!?
+    # exit 1
+fi
+
+echo -n 'set up vault log file: '
+
+# sample output:
+# Path     Type    Description    Replication    Options
+# ----     ----    -----------    -----------    -------
+# file/    file    n/a            replicated     file_path=/var/log/vault/audit.log
+
+audit_lines="$(tail -n +3 <<< "${output}")"
+
+OLD_IFS="${IFS}" && IFS=$'\n'
+
+for audit_line in ${audit_lines}
+do
+    # output contains control characters
+    # https://unix.stackexchange.com/a/96485
+    # shellcheck disable=SC2154
+    clean_line="$(tail -n 1 <<< "${audit_line}" \
+                 | "${sed}" -r "s|\\x1B\\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]||g")"
+
+    IFS="${OLD_IFS}"
+    # https://stackoverflow.com/a/13402368
+    # NOTE: word splitting is intended here
+    # shellcheck disable=SC2206
+    attributes=(${clean_line})
+    OLD_IFS="${IFS}" && IFS=$'\n'
+
+    # shellcheck disable=SC2154
+    if [ "${attributes[1]}" = 'file' ] && \
+       [ "${attributes[4]}" = "file_path=${path_to_log_file}" ]
+    then
+        # TODO: support re-setting to new log file path ?
+        echo 'already set up'
+        echo
+        echo 'HashiCorp Vault instance configuration complete'
+        echo
+        exit 0
+    fi
+done
+
+IFS="${OLD_IFS}"
+
+if output="$(vault audit enable -address="${vault_address}" \
+                         file file_path="${path_to_log_file}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+
+echo
+echo 'HashiCorp Vault instance configuration complete'
+echo
