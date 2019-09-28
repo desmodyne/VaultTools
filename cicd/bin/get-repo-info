@@ -41,7 +41,7 @@ path_to_conf_file='cicd/conf/get-repo-info.yaml'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('git' 'jq' 'realpath' 'yq')
+req_tools=('git' 'jq' 'realpath')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
