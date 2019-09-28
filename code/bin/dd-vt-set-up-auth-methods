@@ -79,33 +79,15 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 echo
 
-echo -n 'Load script configuration file: '
-# conf_file is defined by get_conf_file_arg
-# shellcheck disable=SC2154
-if output="$(yq read "${conf_file}" --tojson 2>&1)"
-then
-    echo 'OK'
-    conf_json="${output}"
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
+# shellcheck disable=SC2034
+attrs=(auth_methods key_file_name path_to_sec_loc vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
 
-echo -n 'Extract script configuration attributes: '
-for attr in auth_methods key_file_name path_to_sec_loc vault_address
-do
-    # https://unix.stackexchange.com/a/68349
-    declare "${attr}"="$(jq -r ".${attr}" <<< "${conf_json}")"
-    # https://unix.stackexchange.com/a/41418
-    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
-    then
-        echo 'ERROR'
-        echo "Failed to get ${attr} attribute from configuration"
-        exit 1
-    fi
-done
-echo 'OK'
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -119,6 +101,7 @@ if ! validate_secure_location;      then exit 1; fi
 # configure script parameters
 
 # full path to file with key and token info
+# shellcheck disable=SC2154
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
 
@@ -157,6 +140,7 @@ function set_up_approle
 
     # NOTE: the vault CLI doesn't seem to support listing roles
     # https://www.vaultproject.io/api/auth/approle/index.html#list-roles
+    # shellcheck disable=SC2154
     full_url="${vault_address}/v1/auth/approle/role"
 
     echo -n '      get existing approle roles: '
@@ -283,6 +267,7 @@ fi
 
 # TODO: this does not support enabling an auth method at a non-default path
 
+# shellcheck disable=SC2154
 if [ "${auth_methods}" = 'null' ]
 then
     echo 'no auth methods configured; skip setup'

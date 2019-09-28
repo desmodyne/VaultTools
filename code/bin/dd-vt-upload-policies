@@ -79,39 +79,21 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 
 echo
 
-echo -n 'Load script configuration file: '
-# conf_file is defined by get_conf_file_arg
-# shellcheck disable=SC2154
-if output="$(yq read "${conf_file}" --tojson 2>&1)"
-then
-    echo 'OK'
-    config="${output}"
-else
-    echo 'ERROR'
-    echo "${output}"
-    exit 1
-fi
+# shellcheck disable=SC2034
+attrs=(key_file_name path_to_sec_loc policies_folder secrets vault_address)
+# shellcheck disable=SC2034
+opt_attrs=()
 
-echo -n 'Extract script configuration attributes: '
-for attr in key_file_name path_to_sec_loc  \
-            policies_folder secrets vault_address
-do
-    # https://unix.stackexchange.com/a/68349
-    declare "${attr}"="$(jq -r ".${attr}" <<< "${config}")"
-    # https://unix.stackexchange.com/a/41418
-    if [ -z "${!attr}" ] || [ "${!attr}" = 'null' ]
-    then
-        echo 'ERROR'
-        echo "Failed to get ${attr} attribute from configuration"
-        exit 1
-    fi
-done
-echo 'OK'
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
 
 
 # TODO: review jq exprs to make these scalable beyond one path
 
 # json data structure with secrets for each service
+# shellcheck disable=SC2154
 serv_secrets="$(jq '.[] | select(.context=="service")' <<< "${secrets}")"
 
 # json data structure with secrets for each user
@@ -129,6 +111,7 @@ if ! validate_secure_location;      then exit 1; fi
 # configure script parameters
 
 # full path to file with key and token info
+# shellcheck disable=SC2154
 path_to_key_file="${path_to_sec_loc}/${key_file_name}"
 
 # TODO: req'd for defunct curl call
@@ -148,7 +131,8 @@ case "${res}" in
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+    2)  # shellcheck disable=SC2154
+        echo "vault at ${vault_address} is sealed; please unseal and try again"
         ;;
     3)  echo "vault at ${vault_address} is not yet initialized"
         ;;
@@ -192,6 +176,7 @@ for serv_name in ${serv_names}
 do
     echo "service ${serv_name}:"
 
+    # shellcheck disable=SC2154
     path_to_conf_file="${path_to_sec_loc}/${policies_folder}/${serv_name}.hcl"
 
     if [ ! -e "${path_to_conf_file}" ]
