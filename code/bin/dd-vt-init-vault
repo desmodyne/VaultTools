@@ -213,19 +213,27 @@ else
     exit 1
 fi
 
-# TODO: add vault UUID and public / private info
-git_msg='initialize vault'
-
-echo -n 'commit init response file: '
-# shellcheck disable=SC2154
-if output="$(git -C "${path_to_sec_loc}" \
-                 commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+# stage and commit only if anything changed
+# https://stackoverflow.com/a/8123841
+# https://stackoverflow.com/a/2659808
+if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
-    echo 'OK'
+    echo 'no change to vault init response file'
 else
-    echo 'ERROR:'
-    echo "${output}"
-    exit 1
+    # TODO: add vault UUID and public / private info
+    git_msg='initialize vault'
+
+    echo -n 'commit init response file: '
+    # shellcheck disable=SC2154
+    if output="$(git -C "${path_to_sec_loc}" \
+                     commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR:'
+        echo "${output}"
+        exit 1
+    fi
 fi
 
 

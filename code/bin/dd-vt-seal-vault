@@ -127,7 +127,7 @@ fi
 # -----------------------------------------------------------------------------
 # seal vault
 
-echo 'seal vault:'
+echo
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
