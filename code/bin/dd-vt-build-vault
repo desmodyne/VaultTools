@@ -52,8 +52,8 @@ fi
 # run BashLib boilerplate functions
 
 if ! configure_platform              ; then exit 1; fi
-if ! get_conf_file_arg "${@}"        ; then exit 1; fi
 if ! extend_path req_tools ext_paths ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------

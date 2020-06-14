@@ -253,6 +253,11 @@ else
     # TODO: add vault UUID and public / private info
     git_msg='add vault status file'
 
+    # TODO: this might pointlessly fail with:
+    #   commit vault info file: ERROR:
+    #   On branch master
+    #   nothing to commit, working tree clean
+
     echo -n 'commit vault info file: '
     # shellcheck disable=SC2154
     if output="$(git -C "${path_to_sec_loc}" \
