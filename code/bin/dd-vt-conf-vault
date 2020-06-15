@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# dd-vt-configure-vault
+# dd-vt-conf-vault
 #
 # configure the vault server
 #
