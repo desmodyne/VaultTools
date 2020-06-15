@@ -1,0 +1,30 @@
+---
+# dd-vt-init-vault.yaml, rendered from dd-vt-init-vault.yaml.j2
+#
+# dd-vt-init-vault script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-15
+
+
+# TODO: add info which attributes are mandatory and which are optional
+# TODO: clarify variables being defined or not / null / value / etc.
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# https://www.vaultproject.io/api/system/init.html#parameters
+
+# number of shares to split the master key into
+secret_shares:     {{ secret_shares }}
+
+# number of shares required to reconstruct the master key
+secret_threshold:  {{ secret_threshold }}
+
+# vault server protocol, host and port
+vault_address:     {{ vault_address }}
