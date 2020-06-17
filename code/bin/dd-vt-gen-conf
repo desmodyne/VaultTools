@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# dd-vt-gen-conf
+#
+# helper script to generate yaml conf snippets for secrets files at a sec loc
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-17
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=()
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# shellcheck disable=SC2034
+attrs=(file_pattern path_to_sec_loc secrets_folder)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to root folder of files with secrets
+# shellcheck disable=SC2154
+path_to_secrets_root="${path_to_sec_loc}/${secrets_folder}"
+
+
+# -----------------------------------------------------------------------------
+# generate conf snippet
+
+pushd "${path_to_secrets_root}" > /dev/null || exit 1
+
+# get suffix from file pattern
+# https://stackoverflow.com/a/965072
+# TODO: this assumes a simple glob like e.g. *.yaml
+ext="${file_pattern##*.}"
+
+mapfile -t matches < <(find . -type f -name "${file_pattern}" | sort)
+
+echo 'conf snippet:'
+echo
+
+for match in "${matches[@]}"
+do
+    # remove ./ find prepends
+    # https://stackoverflow.com/a/29750182
+    match="${match:2}"
+    # remove file suffix
+    # https://stackoverflow.com/a/16623897
+    match="${match%.${ext}}"
+
+    # NOTE: path refers to a path into vault,
+    # $ref refers to the path to the yaml file
+    printf -- "- path : ${match}\n"
+    printf    "  \$ref : ${match}.yaml\n"
+done
+
+popd > /dev/null || exit 1
