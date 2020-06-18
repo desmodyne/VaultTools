@@ -18,8 +18,15 @@ path_to_sec_loc:   {{ path_to_sec_loc }}
 # name of file with keys to unseal vault, relative to path_to_sec_loc
 key_file_name:     {{ key_file_name }}
 
-# message for committing new init file to git
-git_msg:           {{ git_msg }}
+# message for committing new init file to git;
+# NOTE: defined as list of lines to preserve a little sanity:
+# in the yaml spec (of _some_ version, implmented so _some_ degree),
+# multi-line values are somewhat esoteric: https://stackoverflow.com/a/21699210
+# multi-line values with empty lines seem outright impossible...
+git_msg_lines:
+  {%- for git_msg_line in git_msg_lines %}
+  - "{{ git_msg_line }}"
+  {%- endfor %}
 
 # https://www.vaultproject.io/api/system/init.html#parameters
 

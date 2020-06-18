@@ -20,8 +20,15 @@ key_file_name:     {{ key_file_name }}
 # name of file with vault UUID and status info, relative to path_to_sec_loc
 info_file_name:    {{ info_file_name }}
 
-# message for committing new info file to git
-git_msg:           {{ git_msg }}
+# message for committing new init file to git;
+# NOTE: defined as list of lines to preserve a little sanity:
+# in the yaml spec (of _some_ version, implmented so _some_ degree),
+# multi-line values are somewhat esoteric: https://stackoverflow.com/a/21699210
+# multi-line values with empty lines seem outright impossible...
+git_msg_lines:
+  {%- for git_msg_line in git_msg_lines %}
+  - "{{ git_msg_line }}"
+  {%- endfor %}
 
 # vault server protocol, host and port
 vault_address:     {{ vault_address }}

@@ -82,7 +82,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(git_msg info_file_name key_file_name path_to_sec_loc vault_address)
+attrs=(git_msg_lines info_file_name key_file_name path_to_sec_loc vault_address)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -251,6 +251,10 @@ if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
     echo 'no change to vault status file'
 else
+    # convert message lines json array into single multi-line string
+    mapfile -t git_msg_lines < <(jq -r '.[]' <<< "${git_msg_lines}")
+    git_msg="$(printf '%s\n' "${git_msg_lines[@]}")"
+
     echo -n 'commit vault info file: '
     # shellcheck disable=SC2154
     if output="$(git -C "${path_to_sec_loc}" \

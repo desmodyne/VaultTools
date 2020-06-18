@@ -76,7 +76,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(git_msg key_file_name path_to_sec_loc
+attrs=(git_msg_lines key_file_name path_to_sec_loc
        secret_shares secret_threshold vault_address)
 # shellcheck disable=SC2034
 opt_attrs=()
@@ -220,6 +220,10 @@ if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
     echo 'no change to vault init response file'
 else
+    # convert message lines json array into single multi-line string
+    mapfile -t git_msg_lines < <(jq -r '.[]' <<< "${git_msg_lines}")
+    git_msg="$(printf '%s\n' "${git_msg_lines[@]}")"
+
     echo -n 'commit init response file: '
     # shellcheck disable=SC2154
     if output="$(git -C "${path_to_sec_loc}" \
