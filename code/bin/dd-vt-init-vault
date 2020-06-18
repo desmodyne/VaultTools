@@ -76,7 +76,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(key_file_name path_to_sec_loc
+attrs=(git_msg key_file_name path_to_sec_loc
        secret_shares secret_threshold vault_address)
 # shellcheck disable=SC2034
 opt_attrs=()
@@ -220,9 +220,6 @@ if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
     echo 'no change to vault init response file'
 else
-    # TODO: add vault UUID and public / private info
-    git_msg='initialize vault'
-
     echo -n 'commit init response file: '
     # shellcheck disable=SC2154
     if output="$(git -C "${path_to_sec_loc}" \
