@@ -85,8 +85,8 @@ ext="${file_pattern##*.}"
 
 mapfile -t matches < <(find . -type f -name "${file_pattern}" | sort)
 
-echo 'conf snippet:'
 echo
+echo 'conf snippet:'
 
 for match in "${matches[@]}"
 do
@@ -100,7 +100,9 @@ do
     # NOTE: path refers to a path into vault,
     # $ref refers to the path to the yaml file
     printf -- "- path : ${match}\n"
-    printf    "  \$ref : ${match}.yaml\n"
+    printf    "  file : ${match}.yaml\n"
 done
+
+echo
 
 popd > /dev/null || exit 1
