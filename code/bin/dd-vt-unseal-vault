@@ -82,7 +82,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(git_msg_lines info_file_name key_file_name path_to_sec_loc vault_address)
+attrs=(git_msg_lines info_file_name key_file_name path_to_sec_loc vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -116,13 +116,13 @@ get_vault_status
 res=$?
 case "${res}" in
     0)  # shellcheck disable=SC2154
-        echo "vault at ${vault_address} is already unsealed"
+        echo "vault at ${vault_host} is already unsealed"
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
     2)  #
         ;;
-    3)  echo "vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -151,7 +151,7 @@ do
                       --request PUT                     \
                       --show-error                      \
                       --silent                          \
-                      "${vault_address}/v1/sys/unseal" 2>&1)"
+                      "${vault_host}/v1/sys/unseal" 2>&1)"
     then
         # if successful, curl returns 0 and
         # output is json with unseal status;
@@ -210,7 +210,7 @@ fi
 # NOTE: this somewhat duplicates dd-vt-vault.lib > get_vault_status,
 # but here, the actual output is needed and not only the status code
 echo -n 'get vault status: '
-if output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+if output="$(vault status -address="${vault_host}" -format=json 2>&1)"
 then
     echo 'OK'
     vault_status="${output}"

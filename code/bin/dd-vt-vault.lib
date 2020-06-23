@@ -55,7 +55,7 @@ function get_vault_status
     #   }
 
     # shellcheck disable=SC2154
-    output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+    output="$(vault status -address="${vault_host}" -format=json 2>&1)"
     res=$?
 
     case "${res}" in

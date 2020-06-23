@@ -80,7 +80,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(auth_methods key_file_name path_to_sec_loc vault_address)
+attrs=(auth_methods key_file_name path_to_sec_loc vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -141,7 +141,7 @@ function set_up_approle
     # NOTE: the vault CLI doesn't seem to support listing roles
     # https://www.vaultproject.io/api/auth/approle/index.html#list-roles
     # shellcheck disable=SC2154
-    full_url="${vault_address}/v1/auth/approle/role"
+    full_url="${vault_host}/v1/auth/approle/role"
 
     echo -n '      get existing approle roles: '
     if output="$(curl --header "X-Vault-Token: ${root_token}"       \
@@ -203,7 +203,7 @@ function set_up_approle
         # a possibly large number of arguments from json into cmd line params:
         # https://www.vaultproject.io/api/auth/ ...
         #  ... approle/index.html#create-update-approle
-        full_url="${vault_address}/v1/auth/approle/role/${role_name}"
+        full_url="${vault_host}/v1/auth/approle/role/${role_name}"
 
         # jq expression to get conf for current role
         jq_expr=".[] | select(.role_name == \"${role_name}\")"
@@ -250,9 +250,9 @@ case "${res}" in
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "vault at ${vault_address} is sealed; please unseal and try again"
+    2)  echo "vault at ${vault_host} is sealed; please unseal and try again"
         ;;
-    3)  echo "vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -283,7 +283,7 @@ root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 # https://www.vaultproject.io/docs/commands/login.html
 echo -n 'log into vault: '
-if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+if output="$(vault login -address="${vault_host}" "${root_token}" 2>&1)"
 then
     echo 'OK'
 else
@@ -294,7 +294,7 @@ fi
 
 # https://www.vaultproject.io/docs/commands/auth/list.html
 echo -n 'get enabled auth methods: '
-if output="$(vault auth list -address="${vault_address}"  -format=json 2>&1)"
+if output="$(vault auth list -address="${vault_host}"  -format=json 2>&1)"
 then
     echo 'OK'
     enabled_auth_meth_json="${output}"
@@ -388,7 +388,7 @@ do
             then
                 echo 'already enabled'
             else
-                if output="$(vault auth enable -address="${vault_address}" \
+                if output="$(vault auth enable -address="${vault_host}" \
                                                "${auth_meth_name}" 2>&1)"
                 then
                     echo 'OK'

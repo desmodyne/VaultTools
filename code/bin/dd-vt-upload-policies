@@ -80,7 +80,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(key_file_name path_to_sec_loc policies_folder secrets vault_address)
+attrs=(key_file_name path_to_sec_loc policies_folder secrets vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -132,9 +132,9 @@ case "${res}" in
     1)  # error message is displayed by get_vault_status
         ;;
     2)  # shellcheck disable=SC2154
-        echo "vault at ${vault_address} is sealed; please unseal and try again"
+        echo "vault at ${vault_host} is sealed; please unseal and try again"
         ;;
-    3)  echo "vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -152,10 +152,10 @@ fi
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 # TODO: this fails, address is ignored
-# if output="$(vault login "${root_token}" -address="${vault_address}" 2>&1)"
+# if output="$(vault login "${root_token}" -address="${vault_host}" 2>&1)"
 
 echo -n 'log into vault: '
-if output="$(vault login -address="${vault_address}" "${root_token}" 2>&1)"
+if output="$(vault login -address="${vault_host}" "${root_token}" 2>&1)"
 then
     echo 'OK'
 else
@@ -187,7 +187,7 @@ do
     fi
 
     echo -n '  upload policy: '
-    if output="$(vault policy write -address="${vault_address}" \
+    if output="$(vault policy write -address="${vault_host}" \
                        "${serv_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'
@@ -239,7 +239,7 @@ do
     #                   --request POST                          \
     #                   --show-error                            \
     #                   --silent                                \
-    #               "${vault_address}/v1/sys/policy/${user_name}" 2>&1)"
+    #               "${vault_host}/v1/sys/policy/${user_name}" 2>&1)"
     # then
     #     # if successful, curl returns 0 and output is empty
     #     if [ -z "${output}" ]
@@ -274,7 +274,7 @@ do
     #   vault write sys/policy/my-policy policy=@my-policy.hcl
 
     echo -n '  upload policy: '
-    if output="$(vault policy write -address="${vault_address}" \
+    if output="$(vault policy write -address="${vault_host}" \
                        "${user_name}" "${path_to_conf_file}" 2>&1)"
     then
         echo 'OK'

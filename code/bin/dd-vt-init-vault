@@ -77,7 +77,7 @@ echo
 
 # shellcheck disable=SC2034
 attrs=(git_msg_lines key_file_name path_to_sec_loc
-       secret_shares secret_threshold vault_address)
+       secret_shares secret_threshold vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -115,13 +115,13 @@ get_vault_status
 res=$?
 case "${res}" in
     0)  # shellcheck disable=SC2154
-        echo "  vault at ${vault_address} is already initialized - and unsealed"
+        echo "  vault at ${vault_host} is already initialized - and unsealed"
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "  vault at ${vault_address} is already initialized - and sealed"
+    2)  echo "  vault at ${vault_host} is already initialized - and sealed"
         ;;
-    3)  echo "  vault at ${vault_address} is not yet initialized"
+    3)  echo "  vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -165,7 +165,7 @@ if output="$(curl --data "${json_data}" \
                   --request PUT         \
                   --show-error          \
                   --silent              \
-                  "${vault_address}/v1/sys/init" 2>&1)"
+                  "${vault_host}/v1/sys/init" 2>&1)"
 then
     # if successful, curl returns 0 and
     # output is json with keys and token
