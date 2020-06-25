@@ -133,6 +133,11 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
+# https://www.vaultproject.io/docs/commands/login.html
+# TODO: do this using curl to remove dependency on vault client
+# TODO: logging in using the vault client establishes a session
+# which is not required nor used when using curl later on;
+# also, this stores the token locally in ~/.vault-token
 echo -n 'log into vault: '
 if output="$(vault login -address="${vault_host}" "${root_token}" 2>&1)"
 then
@@ -168,6 +173,7 @@ echo -n 'set up vault log file: '
 
 audit_lines="$(tail -n +3 <<< "${output}")"
 
+# TODO: use bash array
 OLD_IFS="${IFS}" && IFS=$'\n'
 
 for audit_line in ${audit_lines}
