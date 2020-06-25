@@ -199,22 +199,21 @@ do
                       --request POST                            \
                       "${full_url}" 2>&1)"
     then
-        # TODO: only for dev, remove
-        if [ -n "${output}" ]
-        then
-            echo
-            echo 'vault response:'
-            jq '.' <<< "${output}"
-            echo
-        fi
+        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
 
-        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        if [ -z "${err_resp}" ]
         then
             echo 'OK'
         else
-            echo 'ERROR'
-            echo "${output}"
-            exit 1
+            if [ "${err_resp}" = "path is already in use at kv-v2/" ]
+            then
+                echo 'IGNORE ERROR'
+                echo "      ${err_resp}"
+            else
+                echo 'ERROR'
+                echo "          ${err_resp}"
+                return 1
+            fi
         fi
     else
         echo 'ERROR'
