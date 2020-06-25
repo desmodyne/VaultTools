@@ -207,6 +207,63 @@ function set_up_approle
 }
 
 
+function enable_userpass
+{
+    if [ $# -ne 2 ]
+    then
+        # get function name: https://stackoverflow.com/a/1835958
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token>"
+        return 1
+    fi
+
+    # TODO: see also enable_approle
+    # TODO: remove code duplication here ./. enable_approle
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    description='Username / password auth method for humans to log in'
+    type='userpass'
+
+    req_data="$(jo description="${description}" type="${type}")"
+    full_url="${vault_host}/v1/sys/auth/userpass"
+
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+    echo -n '    enable auth method: '
+    if output="$(curl "${curl_args[@]}"                     \
+                      --data    "${req_data}"               \
+                      --header  "X-Vault-Token: ${token}"   \
+                      --request POST                        \
+                      "${full_url}" 2>&1)"
+    then
+        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
+
+        if [ -z "${err_resp}" ]
+        then
+            echo 'OK'
+        else
+            if [ "${err_resp}" = "path is already in use at userpass/" ]
+            then
+                echo 'IGNORE ERROR'
+                echo "      ${err_resp}"
+            else
+                echo 'ERROR'
+                echo "          ${err_resp}"
+                return 1
+            fi
+        fi
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        return 1
+    fi
+}
+
+
 # -----------------------------------------------------------------------------
 # configure script parameters
 
@@ -356,10 +413,18 @@ do
 
     case "${method_name}" in
         approle)
-            if ! enable_approle "${vault_host}" "${root_token}"; then exit 1; fi
-            if ! set_up_approle "${vault_host}" \
-                                "${root_token}" \
-                                "${method_conf}"; then exit 1; fi
+            if ! enable_approle  "${vault_host}" \
+                                 "${root_token}";  then exit 1; fi
+            if ! set_up_approle  "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
+            ;;
+        userpass)
+            if ! enable_userpass "${vault_host}" \
+                                 "${root_token}";  then exit 1; fi
+            # if ! set_up_approle "${vault_host}" \
+            #                     "${root_token}" \
+            #                     "${method_conf}";  then exit 1; fi
             ;;
         *)
             echo "    ERROR: auth method ${method_name} is not supported"
