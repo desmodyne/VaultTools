@@ -1,0 +1,357 @@
+#!/usr/bin/env bash
+
+# dd-vt-upload-auth-methods
+#
+# upload (i.e. set up) authentication methods to (on) a vault server
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2019-06-10
+
+
+# https://www.vaultproject.io/docs/auth/index.html
+# https://www.vaultproject.io/api/auth/index.html
+# https://learn.hashicorp.com/vault/getting-started/authentication#auth-methods
+
+# NOTE: see also dd-vt-init-vault and dd-vt-upload-policies
+
+
+echo
+echo 'Upload HashiCorp Vault authentication methods'
+echo
+
+
+# -----------------------------------------------------------------------------
+# define functions: http://stackoverflow.com/a/6212408
+
+# TODO: doc function purpose, parameters, return values, etc.
+# TODO: use function arguments instead of global variables
+
+function enable_approle
+{
+    if [ $# -ne 2 ]
+    then
+        # get function name: https://stackoverflow.com/a/1835958
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token>"
+        return 1
+    fi
+
+    # TODO: validate arguments
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
+    # NOTE: this also works, is shorter, but depends on the vault client:
+    #   vault auth enable -address="${vault_host}" approle
+
+    description='AppRole auth method for machines to log in'
+    type='approle'
+
+    req_data="$(jo description="${description}" type="${type}")"
+    full_url="${vault_host}/v1/sys/auth/approle"
+
+    echo -n '    enable auth method: '
+    if output="$(curl "${curl_args[@]}"                     \
+                      --data    "${req_data}"               \
+                      --header  "X-Vault-Token: ${token}"   \
+                      --request POST                        \
+                      "${full_url}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        return 1
+    fi
+}
+
+
+function set_up_approle
+{
+    if [ $# -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <method conf>"
+        return 1
+    fi
+
+    # TODO: validate arguments
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # auth method conf
+    method_conf="${3}"
+
+    # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
+    # NOTE: this also works, is shorter, but depends on the vault client:
+    #   vault auth enable -address="${vault_host}" approle
+
+    echo '    set up auth method:'
+
+    method_folder="$(jq -r '.method_folder' <<< "${method_conf}")"
+    method_root="$(  jq -r '.method_root'   <<< "${method_conf}")"
+    roles="$(        jq -r '.roles'         <<< "${method_conf}")"
+
+    # TODO: path_to_sec_loc and vault_host are global variables
+    echo
+    echo "      local auth method root folder : ${path_to_sec_loc}/${method_folder}"
+    echo "      vault auth method root url    : ${vault_host}/${method_root}"
+    echo
+
+    # shellcheck disable=SC2154
+    if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
+    then
+        echo '      no roles configured - setup complete'
+        echo
+        return 0
+    else
+        role_paths="$(jq -r '.[].path' <<< "${roles}")"
+    fi
+
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+    echo '      create roles:'
+    echo
+
+    for role_path in "${role_paths[@]}"
+    do
+        jq_expr=".[] | select(.path == \"${role_path}\")"
+        role_conf="$(jq "${jq_expr}" <<< "${roles}")"
+
+        file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${method_folder}/${file}"
+
+        if [ ! -e "${path_to_role_file}" ]
+        then
+            echo '        ERROR: role file does not exist:'
+            echo "          ${file}"
+            return 1
+        fi
+
+        echo -n "        load role conf from file at : ${file}: "
+        if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
+        then
+            echo 'OK'
+            role_json="${output}"
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            return 1
+        fi
+
+        # TODO: Vault does not support folder notation for roles :-(
+        role_path_="$(sed -e 's|/|_|g' <<< "${role_path}")"
+
+        # NOTE: the vault CLI supports creating roles, but requires translating
+        # a possibly large number of arguments from json into cmd line params:
+        # https://www.vaultproject.io/api/auth/ ...
+        #  ... approle/index.html#create-update-approle
+        # https://www.vaultproject.io/api-docs/auth/approle#parameters
+        full_url="${vault_host}/${method_root}/${role_path_}"
+
+        echo -n "        upload role conf to path at : ${role_path_}: "
+        if output="$(curl "${curl_args[@]}"                         \
+                          --data "${role_json}"                     \
+                          --header "X-Vault-Token: ${root_token}"   \
+                          --request POST                            \
+                          "${full_url}" 2>&1)"
+        then
+            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            then
+                echo 'OK'
+            else
+                echo 'ERROR'
+                echo "          ${output}"
+                return 1
+            fi
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
+    done
+}
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'vault' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+# arguments for every curl call
+# http://stackoverflow.com/a/21109454
+curl_args=('--show-error' '--silent')
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# NOTE: deviating from alphabetical order conv for consistency in
+# dd-vt-upload-auth-methods, dd-vt-upload-policies and dd-vt-upload-secrets
+# shellcheck disable=SC2034
+attrs=(key_file_name path_to_sec_loc vault_host
+       methods methods_folder methods_root)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  # shellcheck disable=SC2154
+        echo "vault at ${vault_host} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_host} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# upload authentication methods
+
+# TODO: this does not support enabling an auth method at a non-default path
+
+# shellcheck disable=SC2154
+if [ -z "${methods}" ] || [ "${methods}" = 'null' ]
+then
+    echo 'no auth methods configured; skip setup'
+    echo
+    echo 'HashiCorp Vault authentication method upload complete'
+    echo
+    exit
+else
+    mapfile -t method_names < <(jq -r 'keys[]' <<< "${methods}")
+fi
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+echo -n 'log into vault: '
+if output="$(vault login -address="${vault_host}" "${root_token}" 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR'
+    echo "${output}"
+    exit 1
+fi
+
+echo
+echo 'process auth method configurations:'
+
+for method_name in "${method_names[@]}"
+do
+    echo
+    echo "  ${method_name}:"
+
+    method_conf="$(jq ".${method_name}" <<< "${methods}")"
+
+    # inject methods_folder and methods_root into method_conf
+    jq_expr='.method_folder = $folder + .method_folder | '`
+           `'.method_root   = $root   + .method_root'
+    method_conf="$(jq --arg folder "${methods_folder}/" \
+                      --arg root   "${methods_root}/"   \
+                      "${jq_expr}" <<< "${method_conf}")"
+
+    case "${method_name}" in
+        approle)
+            if ! enable_approle "${vault_host}" "${root_token}"; then exit 1; fi
+            if ! set_up_approle "${vault_host}" \
+                                "${root_token}" \
+                                "${method_conf}"; then exit 1; fi
+            ;;
+        *)
+            echo "    ERROR: auth method ${method_name} is not supported"
+            continue
+            ;;
+    esac
+done
+
+
+echo
+echo 'HashiCorp Vault authentication method upload complete'
+echo
