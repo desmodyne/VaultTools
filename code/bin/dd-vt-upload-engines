@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+
+# dd-vt-upload-engines
+#
+# upload (i.e. set up) engines to (on) a vault server
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-25
+
+
+# https://learn.hashicorp.com/vault/getting-started/secrets-engines
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Upload HashiCorp Vault engines'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'dd-vt-get-template-path' 'jq' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=("${here}")
+
+# arguments for every curl call
+# http://stackoverflow.com/a/21109454
+curl_args=('--show-error' '--silent')
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# NOTE: deviating from alphabetical order conv for consistency in
+# dd-vt-upload-auth-methods, dd-vt-upload-engines and dd-vt-upload-secrets
+# shellcheck disable=SC2034
+attrs=(key_file_name path_to_sec_loc vault_host
+       engines engines_folder engines_root)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  # shellcheck disable=SC2154
+        echo "vault at ${vault_host} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_host} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# upload engines
+
+# shellcheck disable=SC2154
+if [ -z "${engines}" ] || [ "${engines}" = 'null' ]
+then
+    echo 'no engines configured'
+    echo
+    echo 'HashiCorp Vault engines upload complete'
+    echo
+    exit
+else
+    mapfile -t engines_paths < <(jq -r '.[].path' <<< "${engines}")
+fi
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+echo
+echo 'process engines:'
+echo
+echo "  local engines root folder : ${path_to_sec_loc}/${engines_folder}"
+echo "  vault engines root url    : ${vault_host}/${engines_root}"
+
+for engines_path in "${engines_paths[@]}"
+do
+    echo
+
+    jq_expr=".[] | select(.path == \"${engines_path}\")"
+    engines_conf="$(jq "${jq_expr}" <<< "${engines}")"
+
+    file="$(jq -r '.file' <<< "${engines_conf}")"
+    path_to_engines_file="${path_to_sec_loc}/${engines_folder}/${file}"
+
+    if [ ! -e "${path_to_engines_file}" ]
+    then
+        echo '  ERROR: engines file does not exist:'
+        echo "    ${path_to_engines_file}"
+        exit 1
+    fi
+
+    echo -n "  load engines from file at : ${file}: "
+    if output="$(yq read "${path_to_engines_file}" --tojson 2>&1)"
+    then
+        echo 'OK'
+        engines_json="${output}"
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        exit 1
+    fi
+
+    full_url="${vault_host}/${engines_root}/${engines_path}"
+
+    # NOTE: once again, official HashiCorp Vault docs fails to doc how to
+    # enable a KV2 engine using curl; putting info together from many places:
+    # https://learn.hashicorp.com/vault/developer/ ...
+    #  ... sm-static-secrets#step-1-enable-kv-secrets-engine
+    # https://learn.hashicorp.com/vault/secrets-management/sm-versioned-kv
+    # https://www.vaultproject.io/docs/secrets/kv/kv-v2.html
+    # https://www.vaultproject.io/api/secret/kv/kv-v2.html
+    echo -n "  upload engines to path at : ${engines_path}: "
+    if output="$(curl "${curl_args[@]}"                         \
+                      --data    "${engines_json}"              \
+                      --header  "X-Vault-Token: ${root_token}"  \
+                      --request POST                            \
+                      "${full_url}" 2>&1)"
+    then
+        # TODO: only for dev, remove
+        if [ -n "${output}" ]
+        then
+            echo
+            echo 'vault response:'
+            jq '.' <<< "${output}"
+            echo
+        fi
+
+        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "${output}"
+            exit 1
+        fi
+    else
+        echo 'ERROR'
+        echo "        ${output}"
+        exit 1
+    fi
+done
+
+
+echo
+echo 'HashiCorp Vault engines upload complete'
+echo
