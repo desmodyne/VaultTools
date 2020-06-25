@@ -63,22 +63,22 @@ function enable_approle
                       --request POST                        \
                       "${full_url}" 2>&1)"
     then
-        # TODO: only for dev, remove
-        if [ -n "${output}" ]
-        then
-            echo
-            echo 'vault response:'
-            jq '.' <<< "${output}"
-            echo
-        fi
+        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
 
-        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        if [ -z "${err_resp}" ]
         then
             echo 'OK'
         else
-            echo 'ERROR'
-            echo "          ${output}"
-            return 1
+            # TODO: ignore for now, check enabled auth methods in future
+            if [ "${err_resp}" = "path is already in use at approle/" ]
+            then
+                echo 'IGNORE ERROR'
+                echo "      ${err_resp}"
+            else
+                echo 'ERROR'
+                echo "          ${err_resp}"
+                return 1
+            fi
         fi
     else
         echo 'ERROR'
