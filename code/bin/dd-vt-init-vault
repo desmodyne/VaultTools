@@ -12,6 +12,10 @@
 # https://www.vaultproject.io/api/system/init.html
 
 
+# TODO: revoke root token after vault has been fully set up:
+# https://www.vaultproject.io/docs/concepts/tokens#root-tokens
+
+
 echo
 echo 'Initialize HashiCorp Vault instance'
 echo

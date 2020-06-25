@@ -123,6 +123,8 @@ function set_up_approle
     echo "      vault auth method root url    : ${vault_host}/${method_root}"
     echo
 
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
     # shellcheck disable=SC2154
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
     then
@@ -132,8 +134,6 @@ function set_up_approle
     else
         role_paths="$(jq -r '.[].path' <<< "${roles}")"
     fi
-
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
     echo '      create roles:'
     echo
@@ -261,6 +261,126 @@ function enable_userpass
         echo "    ${output}"
         return 1
     fi
+}
+
+
+function set_up_userpass
+{
+    if [ $# -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <method conf>"
+        return 1
+    fi
+
+    # TODO: validate arguments
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # auth method conf
+    method_conf="${3}"
+
+    # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
+    # NOTE: this also works, is shorter, but depends on the vault client:
+    #   vault auth enable -address="${vault_host}" userpass
+
+    echo '    set up auth method:'
+
+    method_folder="$(jq -r '.method_folder' <<< "${method_conf}")"
+    method_root="$(  jq -r '.method_root'   <<< "${method_conf}")"
+    users="$(        jq -r '.users'         <<< "${method_conf}")"
+
+    # TODO: path_to_sec_loc and vault_host are global variables
+    echo
+    echo "      local auth method root folder : ${path_to_sec_loc}/${method_folder}"
+    echo "      vault auth method root url    : ${vault_host}/${method_root}"
+    echo
+
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+    if [ -z "${users}" ] || [ "${users}" = 'null' ]
+    then
+        echo '      no users configured'
+        echo
+    else
+        user_paths="$(jq -r '.[].path' <<< "${users}")"
+    fi
+
+    echo '      create users:'
+    echo
+
+    for user_path in "${user_paths[@]}"
+    do
+        jq_expr=".[] | select(.path == \"${user_path}\")"
+        user_conf="$(jq "${jq_expr}" <<< "${users}")"
+
+        file="$(jq -r '.file' <<< "${user_conf}")"
+        path_to_user_file="${path_to_sec_loc}/${method_folder}/${file}"
+
+        if [ ! -e "${path_to_user_file}" ]
+        then
+            echo '        ERROR: user file does not exist:'
+            echo "          ${file}"
+            return 1
+        fi
+
+        echo -n "        load user conf from file at : ${file}: "
+        if output="$(yq read "${path_to_user_file}" --tojson 2>&1)"
+        then
+            echo 'OK'
+            user_json="${output}"
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            return 1
+        fi
+
+        # TODO: Vault does not support folder notation for users :-(
+        # TODO: if this is done in the same way as for roles,
+        # a user e.g. ssc ends up having a username users_ssc :-(
+        # user_path_="$(sed -e 's|/|_|g' <<< "${user_path}")"
+        user_path_="$(basename "${user_path}")"
+
+        # NOTE: the vault CLI supports creating users, but requires translating
+        # a possibly large number of arguments from json into cmd line params:
+        # https://www.vaultproject.io/api/auth/ ...
+        #  ... userpass/index.html#create-update-userpass
+        # https://www.vaultproject.io/api-docs/auth/userpass#parameters
+        full_url="${vault_host}/${method_root}/${user_path_}"
+
+        echo -n "        upload user conf to path at : ${user_path_}: "
+        if output="$(curl "${curl_args[@]}"                         \
+                          --data "${user_json}"                     \
+                          --header "X-Vault-Token: ${root_token}"   \
+                          --request POST                            \
+                          "${full_url}" 2>&1)"
+        then
+            # TODO: only for dev, remove
+            if [ -n "${output}" ]
+            then
+                echo
+                echo 'vault response:'
+                jq '.' <<< "${output}"
+                echo
+            fi
+
+            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            then
+                echo 'OK'
+            else
+                echo 'ERROR'
+                echo "          ${output}"
+                return 1
+            fi
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
+    done
 }
 
 
@@ -422,9 +542,9 @@ do
         userpass)
             if ! enable_userpass "${vault_host}" \
                                  "${root_token}";  then exit 1; fi
-            # if ! set_up_approle "${vault_host}" \
-            #                     "${root_token}" \
-            #                     "${method_conf}";  then exit 1; fi
+            if ! set_up_userpass "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
             ;;
         *)
             echo "    ERROR: auth method ${method_name} is not supported"
