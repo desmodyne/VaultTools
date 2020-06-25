@@ -228,25 +228,25 @@ do
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "cubbyhole/Projects/MailFlow/Database/feature/database-admin-credentials"
+    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "cubbyhole/Projects/MailFlow/Database/feature/database-reader-credentials"
+    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "cubbyhole/Projects/MailFlow/Database/feature/database-root-credentials"
+    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "cubbyhole/Projects/MailFlow/Database/feature/database-user-credentials"
+    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
     #   }
     # ]
 
@@ -266,25 +266,25 @@ do
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "cubbyhole/Projects/MailFlow/Database/feature/database-admin-credentials"
+    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "cubbyhole/Projects/MailFlow/Database/feature/database-reader-credentials"
+    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "cubbyhole/Projects/MailFlow/Database/feature/database-root-credentials"
+    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "cubbyhole/Projects/MailFlow/Database/feature/database-user-credentials"
+    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
     #     }
     #   ]
     # }
@@ -307,22 +307,22 @@ do
     # echo "${policies_hcl}"
     # sample output:
     # policies_hcl:
-    # path "cubbyhole/Projects/MailFlow/Database/feature/database-admin-credentials"
+    # path "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "cubbyhole/Projects/MailFlow/Database/feature/database-reader-credentials"
+    # path "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "cubbyhole/Projects/MailFlow/Database/feature/database-root-credentials"
+    # path "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "cubbyhole/Projects/MailFlow/Database/feature/database-user-credentials"
+    # path "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
@@ -343,7 +343,7 @@ do
     # sample output:
     # policies_json:
     # {
-    #   "policy": "path \"cubbyhole/ ... (some unreadable long line) ... ]\n}"
+    #   "policy": "path \"kv-v2/ ... (some unreadable long line) ... ]\n}"
     # }
 
     # TODO: vault converts policies path into lower case
