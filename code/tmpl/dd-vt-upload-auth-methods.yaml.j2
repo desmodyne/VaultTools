@@ -33,10 +33,11 @@ methods:           {% if methods is defined and methods %}
 {% for method in methods %}
   {{ method.method_name }}:
     method_folder: {{ method.method_folder }}
-    method_root:   {{ method.method_root }}
-    {% if method.roles is defined %}roles:{% if method.roles %}
+    method_root:   {{ method.method_root }}{% if method.roles is defined %}
+    roles:{% if method.roles %}
     {% for role in method.roles %}- path: {{ role.path }}
-      file: {{ role.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}users:{% if method.users %}
+      file: {{ role.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
+    users:{% if method.users %}
     {% for user in method.users %}- path: {{ user.path }}
       file: {{ user.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if not loop.last %}
 {% endif %}{% endfor %}{% else %}null{% endif %}
