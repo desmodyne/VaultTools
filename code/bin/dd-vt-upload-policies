@@ -356,6 +356,15 @@ do
                       --request POST                            \
                       "${full_url}" 2>&1)"
     then
+        # TODO: only for dev, remove
+        if [ -n "${output}" ]
+        then
+            echo
+            echo 'vault response:'
+            jq '.' <<< "${output}"
+            echo
+        fi
+
         if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
         then
             echo 'OK'

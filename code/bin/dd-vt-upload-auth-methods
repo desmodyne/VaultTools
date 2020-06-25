@@ -54,6 +54,8 @@ function enable_approle
     req_data="$(jo description="${description}" type="${type}")"
     full_url="${vault_host}/v1/sys/auth/approle"
 
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
                       --data    "${req_data}"               \
@@ -61,7 +63,23 @@ function enable_approle
                       --request POST                        \
                       "${full_url}" 2>&1)"
     then
-        echo 'OK'
+        # TODO: only for dev, remove
+        if [ -n "${output}" ]
+        then
+            echo
+            echo 'vault response:'
+            jq '.' <<< "${output}"
+            echo
+        fi
+
+        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
     else
         echo 'ERROR'
         echo "    ${output}"
@@ -163,6 +181,15 @@ function set_up_approle
                           --request POST                            \
                           "${full_url}" 2>&1)"
         then
+            # TODO: only for dev, remove
+            if [ -n "${output}" ]
+            then
+                echo
+                echo 'vault response:'
+                jq '.' <<< "${output}"
+                echo
+            fi
+
             if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
             then
                 echo 'OK'
