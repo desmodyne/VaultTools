@@ -1,0 +1,55 @@
+---
+# dd-vt-create-tokens.yaml, rendered from dd-vt-create-tokens.yaml.j2
+#
+# dd-vt-create-tokens script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-23
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:       {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:         {{ key_file_name }}
+
+# vault server protocol, host and port
+vault_host:            {{ vault_host }}
+
+
+# absolute path to secure location with root folder
+# of folders where to store created tokens
+path_to_token_root:    {{ path_to_token_root }}
+
+# message for committing new init file to git;
+# NOTE: defined as list of lines to preserve a little sanity:
+# in the yaml spec (of _some_ version, implmented so _some_ degree),
+# multi-line values are somewhat esoteric: https://stackoverflow.com/a/21699210
+# multi-line values with empty lines seem outright impossible...
+git_msg_lines:
+  {%- for git_msg_line in git_msg_lines %}
+  - "{{ git_msg_line }}"
+  {%- endfor %}
+
+
+# path to folder with tokens config files, relative to path_to_sec_loc
+tokens_folder:         {{ tokens_folder }}
+
+# vault url path to tokens, relative to vault_host
+tokens_root:           {{ tokens_root }}
+
+# tokens to be created on vault
+# properties:
+#   path: path into vault where the token will be created,
+#         relative to vault_host/tokens_root
+#   file: path to and name of file with token conf,
+#         relative to path_to_sec_loc/tokens_folder
+tokens:            {% if tokens is defined and tokens %}
+{%- for token in tokens %}
+- path: {{ token.path }}
+  file: {{ token.file }}
+{%- endfor %}{% else %}null{% endif %}

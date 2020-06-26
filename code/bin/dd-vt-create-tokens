@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+
+# dd-vt-create-tokens
+#
+# create tokens on a vault server and download them the a local secure location
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-26
+
+
+# https://learn.hashicorp.com/vault/getting-started/ ...
+#  ... authentication#token-authentication
+# https://www.vaultproject.io/api/auth/token
+# https://www.vaultproject.io/docs/concepts/tokens
+# https://www.vaultproject.io/guides/identity/lease <-- !!!
+
+# NOTE: see also dd-vt-init-vault
+
+
+echo
+echo 'Create HashiCorp Vault tokens'
+echo
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# absolute path to BashLib library file
+path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# absolute path to VaultLib library file
+path_to_vaultlib="${here}/dd-vt-vault.lib"
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+req_tools=('curl' 'jq' 'yq')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+ext_paths=()
+
+# arguments for every curl call
+# http://stackoverflow.com/a/21109454
+curl_args=('--show-error' '--silent')
+
+
+# -----------------------------------------------------------------------------
+# load BashLib and VaultLib
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_bashlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_bashlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+if output="$(source "${path_to_vaultlib}" 2>&1)"
+then
+    # shellcheck disable=SC1090
+    source "${path_to_vaultlib}"
+else
+    echo "${output}"
+    exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+if ! configure_platform              ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
+if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# load script configuration
+
+echo
+
+# NOTE: deviating from alphabetical order conv for consistency in
+# dd-vt-upload-methods, dd-vt-create-tokens and dd-vt-upload-secrets
+# shellcheck disable=SC2034
+attrs=(git_msg_lines key_file_name path_to_sec_loc path_to_token_root vault_host
+       tokens tokens_folder tokens_root)
+# shellcheck disable=SC2034
+opt_attrs=()
+
+echo 'Load script configuration file:'
+
+# shellcheck disable=SC2154
+if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# validate configuration and folder at secure location
+if ! validate_config_settings;      then exit 1; fi
+if ! validate_secure_location;      then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# full path to file with key and token info
+# shellcheck disable=SC2154
+path_to_key_file="${path_to_sec_loc}/${key_file_name}"
+
+
+# -----------------------------------------------------------------------------
+get_vault_status
+res=$?
+case "${res}" in
+    0)  #
+        ;;
+    1)  # error message is displayed by get_vault_status
+        ;;
+    2)  # shellcheck disable=SC2154
+        echo "vault at ${vault_host} is sealed; please unseal and try again"
+        ;;
+    3)  echo "vault at ${vault_host} is not yet initialized"
+        ;;
+esac
+
+if [ "${res}" != 0 ]
+then
+    exit "${res}"
+fi
+
+
+# -----------------------------------------------------------------------------
+# upload tokens
+
+# shellcheck disable=SC2154
+if [ -z "${tokens}" ] || [ "${tokens}" = 'null' ]
+then
+    echo 'no tokens configured'
+    echo
+    echo 'HashiCorp Vault tokens upload complete'
+    echo
+    exit
+else
+    mapfile -t tokens_paths < <(jq -r '.[].path' <<< "${tokens}")
+fi
+
+root_token="$(jq -r '.root_token' "${path_to_key_file}")"
+
+jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+echo
+echo 'process tokens:'
+echo
+echo "  local tokens root folder : ${path_to_sec_loc}/${tokens_folder}"
+echo "  vault tokens root url    : ${vault_host}/${tokens_root}"
+
+# TODO: clearly distinguish between singular and plural
+# TODO: handle case of no tokens paths
+for tokens_path in "${tokens_paths[@]}"
+do
+    echo
+
+    jq_expr=".[] | select(.path == \"${tokens_path}\")"
+    tokens_conf="$(jq "${jq_expr}" <<< "${tokens}")"
+
+    file="$(jq -r '.file' <<< "${tokens_conf}")"
+    path_to_tokens_file="${path_to_sec_loc}/${tokens_folder}/${file}"
+
+    if [ ! -e "${path_to_tokens_file}" ]
+    then
+        echo '  ERROR: token conf file does not exist:'
+        echo "    ${path_to_tokens_file}"
+        exit 1
+    fi
+
+    echo -n "  load token conf from file at  : ${file}: "
+    if output="$(yq read "${path_to_tokens_file}" --tojson 2>&1)"
+    then
+        echo 'OK'
+        tokens_json="${output}"
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        exit 1
+    fi
+
+    # TODO: Vault does not support folder notation for tokens :-(
+    # same problem as in several contexts in ./dd-vt-upload-methods
+    tokens_path="$(sed -e 's|/|_|g' <<< "${tokens_path}")"
+    tokens_path="${tokens_path,,}"
+
+    full_url="${vault_host}/${tokens_root}/${tokens_path}"
+
+    echo -n "  create token using path at    : ${tokens_path}: "
+    if output="$(curl "${curl_args[@]}"                         \
+                      --data    "${tokens_json}"                \
+                      --header  "X-Vault-Token: ${root_token}"  \
+                      --request POST                            \
+                      "${full_url}" 2>&1)"
+    then
+        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        then
+            echo 'OK'
+            vault_response="${output}"
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
+    else
+        echo 'ERROR'
+        echo "        ${output}"
+        exit 1
+    fi
+
+    # TODO: verify path_to_token_root is in clean git repo ? see
+    # ./dd-vt-vault.lib > validate_config_settings / validate_secure_location
+    # (which in their current state are utterly unusable for that task...)
+
+    # get relative folder to token file
+    token_folder="$(dirname "${file}")"
+    # replace .yaml suffix by .json
+    # TODO: this assumes .yaml file suffix
+    # TODO: get .token.json from conf ?
+    token_file="$(basename "${file%.yaml}").token.json"
+    # assemble full path to token output file
+    local_file="${path_to_token_root}/${token_folder}/${token_file}"
+
+    # NOTE: each token might be located in a different subfolder,
+    # so can't do this up front, outside of this loop
+    if [ ! -d "${path_to_token_root}/${token_folder}" ]
+    then
+        mkdir -p "${path_to_token_root}/${token_folder}"
+    fi
+
+    echo -n "  save created token to file at : ${local_file}: "
+    if output="$(jq '.' <<< "${vault_response}" > "${local_file}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR'
+        echo "  ${output}"
+        exit 1
+    fi
+done
+
+
+# TODO: path_to_token_root is not the git repo root folder
+
+echo
+echo -n 'stage token files in repository  : '
+if output="$(git -C "${path_to_token_root}" add --all 2>&1)"
+then
+    echo 'OK'
+else
+    echo 'ERROR:'
+    echo "${output}"
+    exit 1
+fi
+
+# stage and commit only if anything changed
+# https://stackoverflow.com/a/8123841
+# https://stackoverflow.com/a/2659808
+# TODO: there are multiple ways to do this being used; align
+if git -C "${path_to_token_root}" diff-index --quiet HEAD --
+then
+    echo 'no changes in repository to commit'
+else
+    # convert message lines json array into single multi-line string
+    mapfile -t git_msg_lines < <(jq -r '.[]' <<< "${git_msg_lines}")
+    git_msg="$(printf '%s\n' "${git_msg_lines[@]}")"
+
+    echo -n 'commit token files to repository : '
+    # shellcheck disable=SC2154
+    if output="$(git -C "${path_to_token_root}" \
+                     commit -m "${git_msg}" "${path_to_token_root}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR:'
+        echo "${output}"
+        exit 1
+    fi
+fi
+
+
+echo
+echo 'HashiCorp Vault tokens creation complete'
+echo
