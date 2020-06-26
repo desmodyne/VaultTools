@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# dd-vt-upload-auth-methods
+# dd-vt-upload-methods
 #
 # upload (i.e. set up) authentication methods to (on) a vault server
 #
@@ -647,7 +647,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # NOTE: deviating from alphabetical order conv for consistency in
-# dd-vt-upload-auth-methods, dd-vt-upload-policies and dd-vt-upload-secrets
+# dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
        methods methods_folder methods_root)

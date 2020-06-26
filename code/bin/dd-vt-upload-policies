@@ -88,7 +88,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # NOTE: deviating from alphabetical order conv for consistency in
-# dd-vt-upload-auth-methods, dd-vt-upload-policies and dd-vt-upload-secrets
+# dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
        policies policies_folder policies_root)
