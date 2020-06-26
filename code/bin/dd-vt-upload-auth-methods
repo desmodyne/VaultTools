@@ -29,10 +29,10 @@ echo
 
 function enable_approle
 {
-    if [ $# -ne 2 ]
+    if [ $# -ne 3 ]
     then
         # get function name: https://stackoverflow.com/a/1835958
-        echo "Usage: ${FUNCNAME[0]} <vault host> <token>"
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
     fi
 
@@ -44,16 +44,37 @@ function enable_approle
     # token used to auth; typically the root token
     token="${2}"
 
+    # auth method conf
+    conf="${3}"
+
     # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
     # NOTE: this also works, is shorter, but depends on the vault client:
     #   vault auth enable -address="${vault_host}" approle
 
-    # TODO: get this from conf
-    description='AppRole auth method for machines to log in'
-    type='approle'
+    # echo 'auth method conf:'
+    # jq '.' <<< "${conf}"
+    # sample output:
+    # auth method conf:
+    # {
+    #   "description": "AppRole auth method for machines to log in",
+    #   "folder": "v1/auth/approle/role",
+    #   "roles": [
+    #     {
+    #       "file": "Projects/MailFlow/Database/feature/builder.yaml",
+    #       "path": "Projects/MailFlow/Database/feature/builder"
+    #     }
+    #   ],
+    #   "root_conf": "v1/auth/approle/role",
+    #   "root_enable": "v1/sys/auth/approle",
+    #   "type": "approle"
+    # }
+
+    description="$(jq -r '.description' <<< "${conf}")"
+    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
+    type="$(       jq -r '.type'        <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/v1/sys/auth/approle"
+    full_url="${vault_host}/${root_enable}"
 
     jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
@@ -93,7 +114,7 @@ function set_up_approle
 {
     if [ $# -ne 3 ]
     then
-        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <method conf>"
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
     fi
 
@@ -106,9 +127,9 @@ function set_up_approle
     token="${2}"
 
     # auth method conf
-    method_conf="${3}"
+    conf="${3}"
 
-    # NOTE: the vault CLI supports creating roles, but requires translating
+    # NOTE: the vault CLI supports conf'ing roles, but requires translating
     # a possibly large number of arguments from json into cmd line params:
     # https://www.vaultproject.io/api/auth/ ...
     #  ... approle/index.html#create-update-approle
@@ -116,19 +137,18 @@ function set_up_approle
 
     echo '    set up auth method:'
 
-    method_folder="$(jq -r '.method_folder' <<< "${method_conf}")"
-    method_root="$(  jq -r '.method_root'   <<< "${method_conf}")"
-    roles="$(        jq -r '.roles'         <<< "${method_conf}")"
+    folder="$(     jq -r '.folder'      <<< "${conf}")"
+    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
+    roles="$(      jq -r '.roles'       <<< "${conf}")"
 
-    # TODO: path_to_sec_loc and vault_host are global variables
+    # TODO: path_to_sec_loc is a global variable - get as arg like vault_host ?
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${method_folder}"
-    echo "      vault auth method root url    : ${vault_host}/${method_root}"
+    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
     echo
 
     jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
-    # shellcheck disable=SC2154
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
     then
         echo '      no roles configured - setup complete'
@@ -147,7 +167,7 @@ function set_up_approle
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
         file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${method_folder}/${file}"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
@@ -168,6 +188,8 @@ function set_up_approle
         fi
 
         # TODO: Vault does not support folder notation for roles :-(
+        # attempting to create a role with / in its name fails with
+        # { "errors": [ "1 error occurred:\n\t* unsupported path\n\n" ] }
         # for now, replace / by _ and live with the fact that all roles
         # end up in Vault as one long list of long role names instead
         # of short role names structured in a hierarchy of folders
@@ -178,7 +200,7 @@ function set_up_approle
         # https://wiki-dev.bash-hackers.org/syntax/pe#case_modification
         role_path="${role_path,,}"
 
-        full_url="${vault_host}/${method_root}/${role_path}"
+        full_url="${vault_host}/${root_conf}/${role_path}"
 
         echo -n "        upload role conf to path at : ${role_path}: "
         if output="$(curl "${curl_args[@]}"                         \
@@ -215,10 +237,9 @@ function set_up_approle
 
 function enable_userpass
 {
-    if [ $# -ne 2 ]
+    if [ $# -ne 3 ]
     then
-        # get function name: https://stackoverflow.com/a/1835958
-        echo "Usage: ${FUNCNAME[0]} <vault host> <token>"
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
     fi
 
@@ -231,11 +252,15 @@ function enable_userpass
     # token used to auth; typically the root token
     token="${2}"
 
-    description='Username / password auth method for humans to log in'
-    type='userpass'
+    # auth method conf
+    conf="${3}"
+
+    description="$(jq -r '.description' <<< "${conf}")"
+    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
+    type="$(       jq -r '.type'        <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/v1/sys/auth/userpass"
+    full_url="${vault_host}/${root_enable}"
 
     jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
@@ -288,17 +313,17 @@ function set_up_userpass
     token="${2}"
 
     # auth method conf
-    method_conf="${3}"
+    conf="${3}"
 
     echo '    set up auth method:'
 
-    method_folder="$(jq -r '.method_folder' <<< "${method_conf}")"
-    method_root="$(  jq -r '.method_root'   <<< "${method_conf}")"
-    users="$(        jq -r '.users'         <<< "${method_conf}")"
+    folder="$(     jq -r '.folder'      <<< "${conf}")"
+    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
+    users="$(      jq -r '.users'       <<< "${conf}")"
 
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${method_folder}"
-    echo "      vault auth method root url    : ${vault_host}/${method_root}"
+    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
     echo
 
     jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
@@ -321,7 +346,7 @@ function set_up_userpass
         user_conf="$(jq "${jq_expr}" <<< "${users}")"
 
         file="$(jq -r '.file' <<< "${user_conf}")"
-        path_to_user_file="${path_to_sec_loc}/${method_folder}/${file}"
+        path_to_user_file="${path_to_sec_loc}/${folder}/${file}"
 
         if [ ! -e "${path_to_user_file}" ]
         then
@@ -347,7 +372,7 @@ function set_up_userpass
         # so just use the 'basename', i.e. only the username itself
         user_path="$(basename "${user_path}")"
 
-        full_url="${vault_host}/${method_root}/${user_path}"
+        full_url="${vault_host}/${root_conf}/${user_path}"
 
         echo -n "        upload user conf to path at : ${user_path}: "
         if output="$(curl "${curl_args[@]}"                         \
@@ -522,24 +547,19 @@ do
 
     method_conf="$(jq ".${method_name}" <<< "${methods}")"
 
-    # inject methods_folder and methods_root into method_conf
-    jq_expr='.method_folder = $folder + .method_folder | '`
-           `'.method_root   = $root   + .method_root'
-    method_conf="$(jq --arg folder "${methods_folder}/" \
-                      --arg root   "${methods_root}/"   \
-                      "${jq_expr}" <<< "${method_conf}")"
-
     case "${method_name}" in
         approle)
             if ! enable_approle  "${vault_host}" \
-                                 "${root_token}";  then exit 1; fi
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
             if ! set_up_approle  "${vault_host}" \
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             ;;
         userpass)
             if ! enable_userpass "${vault_host}" \
-                                 "${root_token}";  then exit 1; fi
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
             if ! set_up_userpass "${vault_host}" \
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi

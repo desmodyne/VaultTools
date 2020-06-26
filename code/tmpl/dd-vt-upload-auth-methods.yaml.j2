@@ -32,8 +32,11 @@ methods_root:      {{ methods_root }}
 methods:           {% if methods is defined and methods %}
 {% for method in methods %}
   {{ method.method_name }}:
-    method_folder: {{ method.method_folder }}
-    method_root:   {{ method.method_root }}{% if method.roles is defined %}
+    description: {{ method.description }}
+    folder:      {{ methods_folder }}/{{ method.folder }}
+    root_conf:   {{ methods_root }}/{{ method.root_conf }}
+    root_enable: {{ method.root_enable }}
+    type:        {{ method.type }}{% if method.roles is defined %}
     roles:{% if method.roles %}
     {% for role in method.roles %}- path: {{ role.path }}
       file: {{ role.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
