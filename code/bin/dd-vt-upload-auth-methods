@@ -48,6 +48,7 @@ function enable_approle
     # NOTE: this also works, is shorter, but depends on the vault client:
     #   vault auth enable -address="${vault_host}" approle
 
+    # TODO: get this from conf
     description='AppRole auth method for machines to log in'
     type='approle'
 
@@ -107,9 +108,11 @@ function set_up_approle
     # auth method conf
     method_conf="${3}"
 
-    # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
-    # NOTE: this also works, is shorter, but depends on the vault client:
-    #   vault auth enable -address="${vault_host}" approle
+    # NOTE: the vault CLI supports creating roles, but requires translating
+    # a possibly large number of arguments from json into cmd line params:
+    # https://www.vaultproject.io/api/auth/ ...
+    #  ... approle/index.html#create-update-approle
+    # https://www.vaultproject.io/api-docs/auth/approle#parameters
 
     echo '    set up auth method:'
 
@@ -132,7 +135,7 @@ function set_up_approle
         echo
         return 0
     else
-        role_paths="$(jq -r '.[].path' <<< "${roles}")"
+        mapfile -t role_paths < <(jq -r '.[].path' <<< "${roles}")
     fi
 
     echo '      create roles:'
@@ -165,16 +168,19 @@ function set_up_approle
         fi
 
         # TODO: Vault does not support folder notation for roles :-(
-        role_path_="$(sed -e 's|/|_|g' <<< "${role_path}")"
+        # for now, replace / by _ and live with the fact that all roles
+        # end up in Vault as one long list of long role names instead
+        # of short role names structured in a hierarchy of folders
+        role_path="$(sed -e 's|/|_|g' <<< "${role_path}")"
 
-        # NOTE: the vault CLI supports creating roles, but requires translating
-        # a possibly large number of arguments from json into cmd line params:
-        # https://www.vaultproject.io/api/auth/ ...
-        #  ... approle/index.html#create-update-approle
-        # https://www.vaultproject.io/api-docs/auth/approle#parameters
-        full_url="${vault_host}/${method_root}/${role_path_}"
+        # TODO: Vault accepts mixed case for role name, but silently
+        # converts upper case to lower case; pre-empt that explicitly:
+        # https://wiki-dev.bash-hackers.org/syntax/pe#case_modification
+        role_path="${role_path,,}"
 
-        echo -n "        upload role conf to path at : ${role_path_}: "
+        full_url="${vault_host}/${method_root}/${role_path}"
+
+        echo -n "        upload role conf to path at : ${role_path}: "
         if output="$(curl "${curl_args[@]}"                         \
                           --data "${role_json}"                     \
                           --header "X-Vault-Token: ${root_token}"   \
@@ -217,7 +223,7 @@ function enable_userpass
     fi
 
     # TODO: see also enable_approle
-    # TODO: remove code duplication here ./. enable_approle
+    # TODO: remove duplicate, really similar code here ./. enable_approle
 
     # vault server protocol, host and port
     vault_host="${1}"
@@ -272,7 +278,8 @@ function set_up_userpass
         return 1
     fi
 
-    # TODO: validate arguments
+    # TODO: see also set_up_approle
+    # TODO: remove duplicate, really similar code here ./. set_up_approle
 
     # vault server protocol, host and port
     vault_host="${1}"
@@ -283,17 +290,12 @@ function set_up_userpass
     # auth method conf
     method_conf="${3}"
 
-    # https://www.vaultproject.io/api-docs/system/auth#enable-auth-method
-    # NOTE: this also works, is shorter, but depends on the vault client:
-    #   vault auth enable -address="${vault_host}" userpass
-
     echo '    set up auth method:'
 
     method_folder="$(jq -r '.method_folder' <<< "${method_conf}")"
     method_root="$(  jq -r '.method_root'   <<< "${method_conf}")"
     users="$(        jq -r '.users'         <<< "${method_conf}")"
 
-    # TODO: path_to_sec_loc and vault_host are global variables
     echo
     echo "      local auth method root folder : ${path_to_sec_loc}/${method_folder}"
     echo "      vault auth method root url    : ${vault_host}/${method_root}"
@@ -303,10 +305,11 @@ function set_up_userpass
 
     if [ -z "${users}" ] || [ "${users}" = 'null' ]
     then
-        echo '      no users configured'
+        echo '      no users configured - setup complete'
         echo
+        return 0
     else
-        user_paths="$(jq -r '.[].path' <<< "${users}")"
+        mapfile -t user_paths < <(jq -r '.[].path' <<< "${users}")
     fi
 
     echo '      create users:'
@@ -340,18 +343,13 @@ function set_up_userpass
 
         # TODO: Vault does not support folder notation for users :-(
         # TODO: if this is done in the same way as for roles,
-        # a user e.g. ssc ends up having a username users_ssc :-(
-        # user_path_="$(sed -e 's|/|_|g' <<< "${user_path}")"
-        user_path_="$(basename "${user_path}")"
+        # a user e.g. ssc ends up having a username users_ssc,
+        # so just use the 'basename', i.e. only the username itself
+        user_path="$(basename "${user_path}")"
 
-        # NOTE: the vault CLI supports creating users, but requires translating
-        # a possibly large number of arguments from json into cmd line params:
-        # https://www.vaultproject.io/api/auth/ ...
-        #  ... userpass/index.html#create-update-userpass
-        # https://www.vaultproject.io/api-docs/auth/userpass#parameters
-        full_url="${vault_host}/${method_root}/${user_path_}"
+        full_url="${vault_host}/${method_root}/${user_path}"
 
-        echo -n "        upload user conf to path at : ${user_path_}: "
+        echo -n "        upload user conf to path at : ${user_path}: "
         if output="$(curl "${curl_args[@]}"                         \
                           --data "${user_json}"                     \
                           --header "X-Vault-Token: ${root_token}"   \
