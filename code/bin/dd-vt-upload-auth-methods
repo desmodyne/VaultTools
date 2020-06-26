@@ -69,6 +69,12 @@ function enable_approle
     #   "type": "approle"
     # }
 
+    # TODO: set path to support multiple instances of one auth method ?
+    # from https://www.vaultproject.io/docs/commands/auth/enable#usage:
+    #   Place where the auth method will be accessible. This must be unique
+    #   across all auth methods. This defaults to the "type" of the auth method.
+    #   The auth method will be accessible at /auth/<path>.
+
     description="$(jq -r '.description' <<< "${conf}")"
     root_enable="$(jq -r '.root_enable' <<< "${conf}")"
     type="$(       jq -r '.type'        <<< "${conf}")"
@@ -198,6 +204,118 @@ function set_up_approle
         # TODO: Vault accepts mixed case for role name, but silently
         # converts upper case to lower case; pre-empt that explicitly:
         # https://wiki-dev.bash-hackers.org/syntax/pe#case_modification
+        role_path="${role_path,,}"
+
+        full_url="${vault_host}/${root_conf}/${role_path}"
+
+        echo -n "        upload role conf to path at : ${role_path}: "
+        if output="$(curl "${curl_args[@]}"                         \
+                          --data "${role_json}"                     \
+                          --header "X-Vault-Token: ${root_token}"   \
+                          --request POST                            \
+                          "${full_url}" 2>&1)"
+        then
+            # TODO: only for dev, remove
+            if [ -n "${output}" ]
+            then
+                echo
+                echo 'vault response:'
+                jq '.' <<< "${output}"
+                echo
+            fi
+
+            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            then
+                echo 'OK'
+            else
+                echo 'ERROR'
+                echo "          ${output}"
+                return 1
+            fi
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
+    done
+}
+
+
+# NOTE: no need to enable token auth method, enabled by default
+
+
+function set_up_token
+{
+    if [ $# -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
+        return 1
+    fi
+
+    # TODO: see also set_up_approle
+    # TODO: remove 100% duplicate code here ./. set_up_approle
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # auth method conf
+    conf="${3}"
+
+    echo '    set up auth method:'
+
+    folder="$(     jq -r '.folder'      <<< "${conf}")"
+    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
+    roles="$(      jq -r '.roles'       <<< "${conf}")"
+
+    echo
+    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo
+
+    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
+
+    if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
+    then
+        echo '      no roles configured - setup complete'
+        echo
+        return 0
+    else
+        mapfile -t role_paths < <(jq -r '.[].path' <<< "${roles}")
+    fi
+
+    echo '      create roles:'
+    echo
+
+    for role_path in "${role_paths[@]}"
+    do
+        jq_expr=".[] | select(.path == \"${role_path}\")"
+        role_conf="$(jq "${jq_expr}" <<< "${roles}")"
+
+        file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
+
+        if [ ! -e "${path_to_role_file}" ]
+        then
+            echo '        ERROR: role file does not exist:'
+            echo "          ${file}"
+            return 1
+        fi
+
+        echo -n "        load role conf from file at : ${file}: "
+        if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
+        then
+            echo 'OK'
+            role_json="${output}"
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            return 1
+        fi
+
+        role_path="$(sed -e 's|/|_|g' <<< "${role_path}")"
         role_path="${role_path,,}"
 
         full_url="${vault_host}/${root_conf}/${role_path}"
@@ -553,6 +671,12 @@ do
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             if ! set_up_approle  "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
+            ;;
+        token)
+            # NOTE: no need to enable token auth method, enabled by default
+            if ! set_up_token    "${vault_host}" \
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             ;;
