@@ -171,6 +171,7 @@ if output="$(curl --data "${json_data}" \
                   --silent              \
                   "${vault_host}/v1/sys/init" 2>&1)"
 then
+    # TODO: review error handling
     # if successful, curl returns 0 and
     # output is json with keys and token
     echo 'OK'

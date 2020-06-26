@@ -131,9 +131,6 @@ echo
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-# TODO: get this from elsewhere
-jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
 echo -n 'seal vault: '
 if output="$(curl --header "X-Vault-Token: ${root_token}" \
                   --request PUT                           \
@@ -141,7 +138,7 @@ if output="$(curl --header "X-Vault-Token: ${root_token}" \
                   --silent                                \
                   "${vault_host}/v1/sys/seal" 2>&1)"
 then
-    if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+    if err_resp="$(check_response "${output}" 2>&1)"
     then
         echo 'OK'
         # TODO: this is not used
@@ -149,7 +146,7 @@ then
         exist_secrets_json="${output}"
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "${err_resp}"
         exit 1
     fi
 else

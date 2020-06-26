@@ -153,6 +153,7 @@ do
                       --silent                          \
                       "${vault_host}/v1/sys/unseal" 2>&1)"
     then
+        # TODO: review error handling
         # if successful, curl returns 0 and
         # output is json with unseal status;
         # otherwise, curl also returns 0 and

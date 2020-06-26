@@ -82,8 +82,6 @@ function enable_approle
     req_data="$(jo description="${description}" type="${type}")"
     full_url="${vault_host}/${root_enable}"
 
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
                       --data    "${req_data}"               \
@@ -91,9 +89,7 @@ function enable_approle
                       --request POST                        \
                       "${full_url}" 2>&1)"
     then
-        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
-
-        if [ -z "${err_resp}" ]
+        if err_resp="$(check_response "${output}" 2>&1)"
         then
             echo 'OK'
         else
@@ -152,8 +148,6 @@ function set_up_approle
     echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
     echo "      vault auth method root url    : ${vault_host}/${root_conf}"
     echo
-
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
     then
@@ -224,12 +218,12 @@ function set_up_approle
                 echo
             fi
 
-            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            if err_resp="$(check_response "${output}" 2>&1)"
             then
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${output}"
+                echo "          ${err_resp}"
                 return 1
             fi
         else
@@ -270,8 +264,6 @@ function enable_token
     req_data="$(jo description="${description}" type="${type}")"
     full_url="${vault_host}/${root_enable}"
 
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
                       --data    "${req_data}"               \
@@ -279,9 +271,7 @@ function enable_token
                       --request POST                        \
                       "${full_url}" 2>&1)"
     then
-        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
-
-        if [ -z "${err_resp}" ]
+        if err_resp="$(check_response "${output}" 2>&1)"
         then
             echo 'OK'
         else
@@ -333,8 +323,6 @@ function set_up_token
     echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
     echo "      vault auth method root url    : ${vault_host}/${root_conf}"
     echo
-
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
     then
@@ -395,12 +383,12 @@ function set_up_token
                 echo
             fi
 
-            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            if err_resp="$(check_response "${output}" 2>&1)"
             then
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${output}"
+                echo "          ${err_resp}"
                 return 1
             fi
         else
@@ -439,8 +427,6 @@ function enable_userpass
     req_data="$(jo description="${description}" type="${type}")"
     full_url="${vault_host}/${root_enable}"
 
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
                       --data    "${req_data}"               \
@@ -448,9 +434,7 @@ function enable_userpass
                       --request POST                        \
                       "${full_url}" 2>&1)"
     then
-        err_resp="$(jq -r "${jq_err}" <<< "${output}")"
-
-        if [ -z "${err_resp}" ]
+        if err_resp="$(check_response "${output}" 2>&1)"
         then
             echo 'OK'
         else
@@ -502,8 +486,6 @@ function set_up_userpass
     echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
     echo "      vault auth method root url    : ${vault_host}/${root_conf}"
     echo
-
-    jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
 
     if [ -z "${users}" ] || [ "${users}" = 'null' ]
     then
@@ -567,12 +549,12 @@ function set_up_userpass
                 echo
             fi
 
-            if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+            if err_resp="$(check_response "${output}" 2>&1)"
             then
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${output}"
+                echo "          ${err_resp}"
                 return 1
             fi
         else

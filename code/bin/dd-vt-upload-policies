@@ -167,8 +167,6 @@ fi
 # absolute path to template to turn json into hcl
 path_to_j2h_tmpl="${path_to_tmpl_root}/${name_of_j2h_tmpl}"
 
-jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
 echo
 echo 'process policies:'
 echo
@@ -373,12 +371,12 @@ do
             echo
         fi
 
-        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        if err_resp="$(check_response "${output}" 2>&1)"
         then
             echo 'OK'
         else
             echo 'ERROR'
-            echo "${output}"
+            echo "  ${err_resp}"
             exit 1
         fi
     else

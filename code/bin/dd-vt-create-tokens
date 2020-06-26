@@ -151,8 +151,6 @@ fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
-jq_err='if .errors and (.errors | length) > 0 then .errors[] else empty end'
-
 echo
 echo 'process tokens:'
 echo
@@ -203,13 +201,13 @@ do
                       --request POST                            \
                       "${full_url}" 2>&1)"
     then
-        if [ -z "$(jq -r "${jq_err}" <<< "${output}")" ]
+        if err_resp="$(check_response "${output}" 2>&1)"
         then
             echo 'OK'
             vault_response="${output}"
         else
             echo 'ERROR'
-            echo "          ${output}"
+            echo "  ${err_resp}"
             return 1
         fi
     else
