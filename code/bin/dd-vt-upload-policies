@@ -187,12 +187,12 @@ do
 
     if [ ! -e "${path_to_policies_file}" ]
     then
-        echo '  ERROR: policies file does not exist:'
+        echo '  ERROR: policy conf file does not exist:'
         echo "    ${path_to_policies_file}"
         exit 1
     fi
 
-    echo -n "  load policies from file at : ${file}: "
+    echo -n "  load policy conf from file at : ${file}: "
     if output="$(yq read "${path_to_policies_file}" --tojson 2>&1)"
     then
         echo 'OK'
@@ -357,7 +357,7 @@ do
     # TODO: vault converts policies path into lower case
     full_url="${vault_host}/${policies_root}/${policies_path}"
 
-    echo -n "  upload policies to path at : ${policies_path}: "
+    echo -n "  upload policy conf to path at : ${policies_path}: "
     if output="$(curl "${curl_args[@]}"                         \
                       --data    "${policies_json}"              \
                       --header  "X-Vault-Token: ${root_token}"  \

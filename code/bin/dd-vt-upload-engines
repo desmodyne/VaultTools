@@ -167,12 +167,12 @@ do
 
     if [ ! -e "${path_to_engines_file}" ]
     then
-        echo '  ERROR: engines file does not exist:'
+        echo '  ERROR: engine conf does not exist:'
         echo "    ${path_to_engines_file}"
         exit 1
     fi
 
-    echo -n "  load engines from file at : ${file}: "
+    echo -n "  load engine conf from file at : ${file}: "
     if output="$(yq read "${path_to_engines_file}" --tojson 2>&1)"
     then
         echo 'OK'
@@ -192,7 +192,7 @@ do
     # https://learn.hashicorp.com/vault/secrets-management/sm-versioned-kv
     # https://www.vaultproject.io/docs/secrets/kv/kv-v2.html
     # https://www.vaultproject.io/api/secret/kv/kv-v2.html
-    echo -n "  upload engines to path at : ${engines_path}: "
+    echo -n "  upload engine conf to path at : ${engines_path}: "
     if output="$(curl "${curl_args[@]}"                         \
                       --data    "${engines_json}"              \
                       --header  "X-Vault-Token: ${root_token}"  \

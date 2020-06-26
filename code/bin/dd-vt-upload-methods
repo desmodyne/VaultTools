@@ -177,7 +177,7 @@ function set_up_approle
 
         if [ ! -e "${path_to_role_file}" ]
         then
-            echo '        ERROR: role file does not exist:'
+            echo '        ERROR: role conf file does not exist:'
             echo "          ${file}"
             return 1
         fi
