@@ -250,14 +250,22 @@ do
     #   }
     # ]
 
-    # inject 'policies' root key to give
-    # jinja a top level item to iterate over:
-    # https://stackoverflow.com/q/54087843
-    policies_json="$(jq '{ policies: . }' <<< "${policies_json}")"
+    # if the yaml file doesn't conf any policies, json is empty;
+    # ensure jinja works and a better error message is displayed in log
+    if [ -z "${policies_json}" ]
+    then
+        policies_json='{ "policies": [] }'
+    else
+        # inject 'policies' root key to give
+        # jinja a top level item to iterate over:
+        # https://stackoverflow.com/q/54087843
+        policies_json="$(jq '{ policies: . }' <<< "${policies_json}")"
+    fi
 
     # echo
     # echo 'policies_json:'
     # jq '.' <<< "${policies_json}"
+    # echo
     # sample output:
     # policies_json:
     # {
