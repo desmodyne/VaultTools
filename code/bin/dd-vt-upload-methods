@@ -235,6 +235,169 @@ function set_up_approle
 }
 
 
+function enable_jwt
+{
+    if [ $# -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
+        return 1
+    fi
+
+    # TODO: see also enable_approle
+    # TODO: remove duplicate, really similar code here ./. enable_approle
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # auth method conf
+    conf="${3}"
+
+    description="$(jq -r '.description' <<< "${conf}")"
+    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
+    type="$(       jq -r '.type'        <<< "${conf}")"
+
+    req_data="$(jo description="${description}" type="${type}")"
+    full_url="${vault_host}/${root_enable}"
+
+    echo -n '    enable auth method: '
+    if output="$(curl "${curl_args[@]}"                     \
+                      --data    "${req_data}"               \
+                      --header  "X-Vault-Token: ${token}"   \
+                      --request POST                        \
+                      "${full_url}" 2>&1)"
+    then
+        if err_resp="$(check_response "${output}" 2>&1)"
+        then
+            echo 'OK'
+        else
+            if [ "${err_resp}" = "path is already in use at jwt/" ]
+            then
+                echo 'IGNORE ERROR'
+                echo "      ${err_resp}"
+            else
+                echo 'ERROR'
+                echo "          ${err_resp}"
+                return 1
+            fi
+        fi
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        return 1
+    fi
+}
+
+
+function set_up_jwt
+{
+    if [ $# -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
+        return 1
+    fi
+
+    # TODO: see also set_up_approle
+    # TODO: remove 100% duplicate code here ./. set_up_approle
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # auth method conf
+    conf="${3}"
+
+    echo '    set up auth method:'
+
+    folder="$(     jq -r '.folder'      <<< "${conf}")"
+    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
+    roles="$(      jq -r '.roles'       <<< "${conf}")"
+
+    echo
+    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo
+
+    if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
+    then
+        echo '      no roles configured - setup complete'
+        echo
+        return 0
+    else
+        mapfile -t role_paths < <(jq -r '.[].path' <<< "${roles}")
+    fi
+
+    echo '      create roles:'
+    echo
+
+    for role_path in "${role_paths[@]}"
+    do
+        jq_expr=".[] | select(.path == \"${role_path}\")"
+        role_conf="$(jq "${jq_expr}" <<< "${roles}")"
+
+        file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
+
+        if [ ! -e "${path_to_role_file}" ]
+        then
+            echo '        ERROR: role conf file does not exist:'
+            echo "          ${file}"
+            return 1
+        fi
+
+        echo -n "        load role conf from file at : ${file}: "
+        if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
+        then
+            echo 'OK'
+            role_json="${output}"
+        else
+            echo 'ERROR'
+            echo "    ${output}"
+            return 1
+        fi
+
+        role_path="$(sed -e 's|/|_|g' <<< "${role_path}")"
+        role_path="${role_path,,}"
+
+        full_url="${vault_host}/${root_conf}/${role_path}"
+
+        echo -n "        upload role conf to path at : ${role_path}: "
+        if output="$(curl "${curl_args[@]}"                         \
+                          --data "${role_json}"                     \
+                          --header "X-Vault-Token: ${root_token}"   \
+                          --request POST                            \
+                          "${full_url}" 2>&1)"
+        then
+            # TODO: only for dev, remove
+            if [ -n "${output}" ]
+            then
+                echo
+                echo 'vault response:'
+                jq '.' <<< "${output}"
+                echo
+            fi
+
+            if err_resp="$(check_response "${output}" 2>&1)"
+            then
+                echo 'OK'
+            else
+                echo 'ERROR'
+                echo "          ${err_resp}"
+                return 1
+            fi
+        else
+            echo 'ERROR'
+            echo "          ${output}"
+            return 1
+        fi
+    done
+}
+
+
 # NOTE: token auth method is enabled by default; this is for consistency
 
 function enable_token
@@ -346,7 +509,7 @@ function set_up_token
 
         if [ ! -e "${path_to_role_file}" ]
         then
-            echo '        ERROR: role file does not exist:'
+            echo '        ERROR: role conf file does not exist:'
             echo "          ${file}"
             return 1
         fi
@@ -712,6 +875,14 @@ do
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             if ! set_up_approle  "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
+            ;;
+        jwt)
+            if ! enable_jwt      "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
+            if ! set_up_jwt      "${vault_host}" \
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             ;;
