@@ -57,14 +57,14 @@ function enable_approle
     # auth method conf:
     # {
     #   "description": "AppRole auth method for machines to log in",
-    #   "folder": "v1/auth/approle/role",
     #   "roles": [
     #     {
     #       "file": "Projects/MailFlow/Database/feature/builder.yaml",
     #       "path": "Projects/MailFlow/Database/feature/builder"
     #     }
     #   ],
-    #   "root_conf": "v1/auth/approle/role",
+    #   "roles_dir_path": "v1/auth/approle/role",
+    #   "roles_url_path": "v1/auth/approle/role",
     #   "root_enable": "v1/sys/auth/approle",
     #   "type": "approle"
     # }
@@ -139,14 +139,14 @@ function set_up_approle
 
     echo '    set up auth method:'
 
-    folder="$(     jq -r '.folder'      <<< "${conf}")"
-    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
-    roles="$(      jq -r '.roles'       <<< "${conf}")"
+    roles_dir_path="$(jq -r '.roles_dir_path' <<< "${conf}")"
+    roles_url_path="$(jq -r '.roles_url_path' <<< "${conf}")"
+    roles="$(         jq -r '.roles'          <<< "${conf}")"
 
     # TODO: path_to_sec_loc is a global variable - get as arg like vault_host ?
     echo
-    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method url path : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${roles_dir_path}"
+    echo "      vault auth method url path : ${vault_host}/${roles_url_path}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -167,7 +167,7 @@ function set_up_approle
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
         role_file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
+        path_to_role_file="${path_to_sec_loc}/${roles_dir_path}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
@@ -200,7 +200,7 @@ function set_up_approle
         # https://wiki-dev.bash-hackers.org/syntax/pe#case_modification
         role_path="${role_path,,}"
 
-        full_url="${vault_host}/${root_conf}/${role_path}"
+        full_url="${vault_host}/${roles_url_path}/${role_path}"
 
         echo -n "        upload role conf to path at : ${role_path}: "
         if output="$(curl "${curl_args[@]}"                         \
@@ -313,13 +313,13 @@ function set_up_jwt
 
     echo '    set up auth method:'
 
-    folder="$(     jq -r '.folder'      <<< "${conf}")"
-    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
-    roles="$(      jq -r '.roles'       <<< "${conf}")"
+    roles_dir_path="$(jq -r '.roles_dir_path' <<< "${conf}")"
+    roles_url_path="$(jq -r '.roles_url_path' <<< "${conf}")"
+    roles="$(         jq -r '.roles'          <<< "${conf}")"
 
     echo
-    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method url path : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${roles_dir_path}"
+    echo "      vault auth method url path : ${vault_host}/${roles_url_path}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -340,7 +340,7 @@ function set_up_jwt
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
         role_file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
+        path_to_role_file="${path_to_sec_loc}/${roles_dir_path}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
@@ -363,7 +363,7 @@ function set_up_jwt
         role_path="$(sed -e 's|/|_|g' <<< "${role_path}")"
         role_path="${role_path,,}"
 
-        full_url="${vault_host}/${root_conf}/${role_path}"
+        full_url="${vault_host}/${roles_url_path}/${role_path}"
 
         echo -n "        upload role conf to path at : ${role_path}: "
         if output="$(curl "${curl_args[@]}"                         \
@@ -373,13 +373,27 @@ function set_up_jwt
                           "${full_url}" 2>&1)"
         then
             # TODO: only for dev, remove
-            if [ -n "${output}" ]
-            then
-                echo
-                echo 'vault response:'
-                jq '.' <<< "${output}"
-                echo
-            fi
+            # if [ -n "${output}" ]
+            # then
+            #     echo
+            #     echo 'vault response:'
+            #     jq '.' <<< "${output}"
+            #     echo
+            # fi
+
+            # TODO: for some reason, this REST API endpoint returns a response
+            # - an utterly useless one - none of the other methods does that:
+            # vault response:
+            # {
+            #   "request_id": "9fbdf6de-3592-0a98-f515-d250e773985b",
+            #   "lease_id": "",
+            #   "renewable": false,
+            #   "lease_duration": 0,
+            #   "data": null,
+            #   "wrap_info": null,
+            #   "warnings": null,
+            #   "auth": null
+            # }
 
             if err_resp="$(check_response "${output}" 2>&1)"
             then
@@ -478,13 +492,13 @@ function set_up_token
 
     echo '    set up auth method:'
 
-    folder="$(     jq -r '.folder'      <<< "${conf}")"
-    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
-    roles="$(      jq -r '.roles'       <<< "${conf}")"
+    roles_dir_path="$(jq -r '.roles_dir_path' <<< "${conf}")"
+    roles_url_path="$(jq -r '.roles_url_path' <<< "${conf}")"
+    roles="$(         jq -r '.roles'          <<< "${conf}")"
 
     echo
-    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method url path : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${roles_dir_path}"
+    echo "      vault auth method url path : ${vault_host}/${roles_url_path}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -505,7 +519,7 @@ function set_up_token
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
         role_file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
+        path_to_role_file="${path_to_sec_loc}/${roles_dir_path}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
@@ -528,7 +542,7 @@ function set_up_token
         role_path="$(sed -e 's|/|_|g' <<< "${role_path}")"
         role_path="${role_path,,}"
 
-        full_url="${vault_host}/${root_conf}/${role_path}"
+        full_url="${vault_host}/${roles_url_path}/${role_path}"
 
         echo -n "        upload role conf to path at : ${role_path}: "
         if output="$(curl "${curl_args[@]}"                         \
@@ -641,13 +655,13 @@ function set_up_userpass
 
     echo '    set up auth method:'
 
-    folder="$(     jq -r '.folder'      <<< "${conf}")"
-    root_conf="$(  jq -r '.root_conf'   <<< "${conf}")"
-    users="$(      jq -r '.users'       <<< "${conf}")"
+    users_dir_path="$(jq -r '.users_dir_path' <<< "${conf}")"
+    users_url_path="$(jq -r '.users_url_path' <<< "${conf}")"
+    users="$(         jq -r '.users'          <<< "${conf}")"
 
     echo
-    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method url path : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${users_dir_path}"
+    echo "      vault auth method url path : ${vault_host}/${users_url_path}"
     echo
 
     if [ -z "${users}" ] || [ "${users}" = 'null' ]
@@ -667,17 +681,17 @@ function set_up_userpass
         jq_expr=".[] | select(.path == \"${user_path}\")"
         user_conf="$(jq "${jq_expr}" <<< "${users}")"
 
-        role_file="$(jq -r '.file' <<< "${user_conf}")"
-        path_to_user_file="${path_to_sec_loc}/${folder}/${role_file}"
+        user_file="$(jq -r '.file' <<< "${user_conf}")"
+        path_to_user_file="${path_to_sec_loc}/${users_dir_path}/${user_file}"
 
         if [ ! -e "${path_to_user_file}" ]
         then
             echo '        ERROR: user conf file does not exist:'
-            echo "          ${role_file}"
+            echo "          ${user_file}"
             return 1
         fi
 
-        echo -n "        load user conf from file at : ${role_file}: "
+        echo -n "        load user conf from file at : ${user_file}: "
         if output="$(yq read "${path_to_user_file}" --tojson 2>&1)"
         then
             echo 'OK'
@@ -694,7 +708,7 @@ function set_up_userpass
         # so just use the 'basename', i.e. only the username itself
         user_path="$(basename "${user_path}")"
 
-        full_url="${vault_host}/${root_conf}/${user_path}"
+        full_url="${vault_host}/${users_url_path}/${user_path}"
 
         echo -n "        upload user conf to path at : ${user_path}: "
         if output="$(curl "${curl_args[@]}"                         \

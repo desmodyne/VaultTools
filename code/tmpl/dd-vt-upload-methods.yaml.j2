@@ -31,11 +31,13 @@ methods_url_path:  {{ methods_url_path }}
 methods:           {% if methods is defined and methods %}
 {% for method in methods %}
   {{ method.method_name }}:
-    description: {{ method.description }}
-    folder:      {{ methods_dir_path }}/{{ method.folder }}
-    root_conf:   {{ methods_url_path }}/{{ method.root_conf }}
-    root_enable: {{ method.root_enable }}
-    type:        {{ method.type }}{% if method.roles is defined %}
+    description:       {{ method.description }}
+    type:              {{ method.type }}
+    root_enable:       {{ method.root_enable }}{% if method.roles_dir_path is defined and method.roles_dir_path %}
+    roles_dir_path:    {{ methods_dir_path }}/{{ method.roles_dir_path }}{% endif %}{% if method.roles_url_path is defined and method.roles_url_path %}
+    roles_url_path:    {{ methods_url_path }}/{{ method.roles_url_path }}{% endif %}{% if method.users_dir_path is defined and method.users_dir_path %}
+    users_dir_path:    {{ methods_dir_path }}/{{ method.users_dir_path }}{% endif %}{% if method.users_url_path is defined and method.users_url_path %}
+    users_url_path:    {{ methods_url_path }}/{{ method.users_url_path }}{% endif %}{% if method.roles is defined %}
     roles:{% if method.roles %}
     {% for role in method.roles %}- path: {{ role.path }}
       file: {{ role.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
