@@ -55,7 +55,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(file_pattern path_to_sec_loc secrets_folder)
+attrs=(file_pattern path_to_sec_loc secrets_dir_path)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -70,13 +70,13 @@ if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
 
 # full path to root folder of files with secrets
 # shellcheck disable=SC2154
-path_to_secrets_root="${path_to_sec_loc}/${secrets_folder}"
+path_to_secrets_url_path="${path_to_sec_loc}/${secrets_dir_path}"
 
 
 # -----------------------------------------------------------------------------
 # generate conf snippet
 
-pushd "${path_to_secrets_root}" > /dev/null || exit 1
+pushd "${path_to_secrets_url_path}" > /dev/null || exit 1
 
 # get suffix from file pattern
 # https://stackoverflow.com/a/965072
