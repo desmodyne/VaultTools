@@ -142,7 +142,7 @@ then
     echo
     exit
 else
-    mapfile -t engines_paths < <(jq -r '.[].path' <<< "${engines}")
+    mapfile -t engine_paths < <(jq -r '.[].path' <<< "${engines}")
 fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
@@ -150,38 +150,38 @@ root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 echo
 echo 'process engines:'
 echo
-echo "  local engines root folder : ${path_to_sec_loc}/${engines_dir_path}"
-echo "  vault engines root url    : ${vault_host}/${engines_url_path}"
+echo "  local engines dir path : ${path_to_sec_loc}/${engines_dir_path}"
+echo "  vault engines url path : ${vault_host}/${engines_url_path}"
 
-for engines_path in "${engines_paths[@]}"
+for engine_path in "${engine_paths[@]}"
 do
     echo
 
-    jq_expr=".[] | select(.path == \"${engines_path}\")"
-    engines_conf="$(jq "${jq_expr}" <<< "${engines}")"
+    jq_expr=".[] | select(.path == \"${engine_path}\")"
+    engine_conf="$(jq "${jq_expr}" <<< "${engines}")"
 
-    file="$(jq -r '.file' <<< "${engines_conf}")"
-    path_to_engines_file="${path_to_sec_loc}/${engines_dir_path}/${file}"
+    engine_file="$(jq -r '.file' <<< "${engine_conf}")"
+    path_to_engine_file="${path_to_sec_loc}/${engines_dir_path}/${engine_file}"
 
-    if [ ! -e "${path_to_engines_file}" ]
+    if [ ! -e "${path_to_engine_file}" ]
     then
         echo '  ERROR: engine conf does not exist:'
-        echo "    ${path_to_engines_file}"
+        echo "    ${path_to_engine_file}"
         exit 1
     fi
 
-    echo -n "  load engine conf from file at : ${file}: "
-    if output="$(yq read "${path_to_engines_file}" --tojson 2>&1)"
+    echo -n "  load engine conf from file at : ${engine_file}: "
+    if output="$(yq read "${path_to_engine_file}" --tojson 2>&1)"
     then
         echo 'OK'
-        engines_json="${output}"
+        engine_json="${output}"
     else
         echo 'ERROR'
         echo "    ${output}"
         exit 1
     fi
 
-    full_url="${vault_host}/${engines_url_path}/${engines_path}"
+    full_url="${vault_host}/${engines_url_path}/${engine_path}"
 
     # NOTE: once again, official HashiCorp Vault docs fails to doc how to
     # enable a KV2 engine using curl; putting info together from many places:
@@ -190,9 +190,9 @@ do
     # https://learn.hashicorp.com/vault/secrets-management/sm-versioned-kv
     # https://www.vaultproject.io/docs/secrets/kv/kv-v2.html
     # https://www.vaultproject.io/api/secret/kv/kv-v2.html
-    echo -n "  upload engine conf to path at : ${engines_path}: "
+    echo -n "  upload engine conf to path at : ${engine_path}: "
     if output="$(curl "${curl_args[@]}"                         \
-                      --data    "${engines_json}"              \
+                      --data    "${engine_json}"                \
                       --header  "X-Vault-Token: ${root_token}"  \
                       --request POST                            \
                       "${full_url}" 2>&1)"
