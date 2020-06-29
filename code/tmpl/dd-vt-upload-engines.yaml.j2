@@ -22,17 +22,17 @@ vault_host:        {{ vault_host }}
 
 
 # path to folder with engines config files, relative to path_to_sec_loc
-engines_folder:    {{ engines_folder }}
+engines_dir_path:  {{ engines_dir_path }}
 
-# vault url path to engines, relative to vault_host
-engines_root:      {{ engines_root }}
+# path to vault url with engines REST endpoints, relative to vault_host
+engines_url_path:  {{ engines_url_path }}
 
 # engines to be uploaded to vault
 # properties:
 #   path: path into vault where the engine will be stored,
-#         relative to vault_host/engines_root
+#         relative to vault_host/engines_url_path
 #   file: path to and name of file with engine conf,
-#         relative to path_to_sec_loc/engines_folder
+#         relative to path_to_sec_loc/engines_dir_path
 engines:           {% if engines is defined and engines %}
 {%- for engine in engines %}
 - path: {{ engine.path }}

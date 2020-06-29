@@ -85,7 +85,7 @@ echo
 # dd-vt-upload-methods, dd-vt-upload-engines and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
-       engines engines_folder engines_root)
+       engines engines_dir_path engines_url_path)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -150,8 +150,8 @@ root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 echo
 echo 'process engines:'
 echo
-echo "  local engines root folder : ${path_to_sec_loc}/${engines_folder}"
-echo "  vault engines root url    : ${vault_host}/${engines_root}"
+echo "  local engines root folder : ${path_to_sec_loc}/${engines_dir_path}"
+echo "  vault engines root url    : ${vault_host}/${engines_url_path}"
 
 for engines_path in "${engines_paths[@]}"
 do
@@ -161,7 +161,7 @@ do
     engines_conf="$(jq "${jq_expr}" <<< "${engines}")"
 
     file="$(jq -r '.file' <<< "${engines_conf}")"
-    path_to_engines_file="${path_to_sec_loc}/${engines_folder}/${file}"
+    path_to_engines_file="${path_to_sec_loc}/${engines_dir_path}/${file}"
 
     if [ ! -e "${path_to_engines_file}" ]
     then
@@ -181,7 +181,7 @@ do
         exit 1
     fi
 
-    full_url="${vault_host}/${engines_root}/${engines_path}"
+    full_url="${vault_host}/${engines_url_path}/${engines_path}"
 
     # NOTE: once again, official HashiCorp Vault docs fails to doc how to
     # enable a KV2 engine using curl; putting info together from many places:
