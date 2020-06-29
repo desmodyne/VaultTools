@@ -37,17 +37,17 @@ git_msg_lines:
 
 
 # path to folder with tokens config files, relative to path_to_sec_loc
-tokens_folder:         {{ tokens_folder }}
+tokens_dir_path:       {{ tokens_dir_path }}
 
 # vault url path to tokens, relative to vault_host
-tokens_root:           {{ tokens_root }}
+tokens_url_path:       {{ tokens_url_path }}
 
 # tokens to be created on vault
 # properties:
 #   path: path into vault where the token will be created,
-#         relative to vault_host/tokens_root
+#         relative to vault_host/tokens_url_path
 #   file: path to and name of file with token conf,
-#         relative to path_to_sec_loc/tokens_folder
+#         relative to path_to_sec_loc/tokens_dir_path
 tokens:            {% if tokens is defined and tokens %}
 {%- for token in tokens %}
 - path: {{ token.path }}
