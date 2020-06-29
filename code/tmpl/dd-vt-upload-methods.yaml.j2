@@ -22,18 +22,18 @@ vault_host:        {{ vault_host }}
 
 
 # path to folder with per-auth methods folders, rel to path_to_sec_loc
-methods_folder:    {{ methods_folder }}
+methods_dir_path:  {{ methods_dir_path }}
 
 # vault url path to per-auth methods paths, relative to vault_host
-methods_root:      {{ methods_root }}
+methods_url_path:  {{ methods_url_path }}
 
 # auth methods to be uploaded to / set up in vault
 methods:           {% if methods is defined and methods %}
 {% for method in methods %}
   {{ method.method_name }}:
     description: {{ method.description }}
-    folder:      {{ methods_folder }}/{{ method.folder }}
-    root_conf:   {{ methods_root }}/{{ method.root_conf }}
+    folder:      {{ methods_dir_path }}/{{ method.folder }}
+    root_conf:   {{ methods_url_path }}/{{ method.root_conf }}
     root_enable: {{ method.root_enable }}
     type:        {{ method.type }}{% if method.roles is defined %}
     roles:{% if method.roles %}

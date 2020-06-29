@@ -795,7 +795,7 @@ echo
 # dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
-       methods methods_folder methods_root)
+       methods methods_dir_path methods_url_path)
 # shellcheck disable=SC2034
 opt_attrs=()
 
