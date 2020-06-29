@@ -291,6 +291,74 @@ function enable_jwt
 }
 
 
+function conf_jwt
+{
+    if [ ${#} -ne 3 ]
+    then
+        echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
+        return 1
+    fi
+
+    # vault server protocol, host and port
+    vault_host="${1}"
+
+    # token used to auth; typically the root token
+    token="${2}"
+
+    # method conf
+    conf="${3}"
+
+    echo '    configure authentication method:'
+
+    conf_url_path="$(jq -r '.conf_url_path' <<< "${conf}")"
+    conf_dir_file="$(jq -r '.conf_dir_file' <<< "${conf}")"
+
+    path_to_conf_file="${path_to_sec_loc}/${conf_dir_file}"
+
+    if [ ! -e "${path_to_conf_file}" ]
+    then
+        echo '      ERROR: method conf file does not exist:'
+        echo "        ${conf_dir_file}"
+        return 1
+    fi
+
+    echo -n "      load method conf from file at : ${conf_dir_file}: "
+    if output="$(yq read "${path_to_conf_file}" --tojson 2>&1)"
+    then
+        echo 'OK'
+        conf_json="${output}"
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        return 1
+    fi
+
+    req_data="${conf_json}"
+    full_url="${vault_host}/${conf_url_path}"
+
+    echo -n "      upload method conf to path at : ${conf_url_path}: "
+    if output="$(curl "${curl_args[@]}"                     \
+                      --data    "${req_data}"               \
+                      --header  "X-Vault-Token: ${token}"   \
+                      --request POST                        \
+                      "${full_url}" 2>&1)"
+    then
+        if err_resp="$(check_response "${output}" 2>&1)"
+        then
+            echo 'OK'
+        else
+            echo 'ERROR'
+            echo "    ${err_resp}"
+            return 1
+        fi
+    else
+        echo 'ERROR'
+        echo "    ${output}"
+        return 1
+    fi
+}
+
+
 function set_up_jwt
 {
     if [ ${#} -ne 3 ]
@@ -896,6 +964,9 @@ do
             ;;
         jwt)
             if ! enable_jwt      "${vault_host}" \
+                                 "${root_token}" \
+                                 "${method_conf}"; then exit 1; fi
+            if ! conf_jwt        "${vault_host}" \
                                  "${root_token}" \
                                  "${method_conf}"; then exit 1; fi
             if ! set_up_jwt      "${vault_host}" \
