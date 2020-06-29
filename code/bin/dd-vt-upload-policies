@@ -148,7 +148,7 @@ then
     echo
     exit
 else
-    mapfile -t policies_paths < <(jq -r '.[].path' <<< "${policies}")
+    mapfile -t policy_paths < <(jq -r '.[].path' <<< "${policies}")
 fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
@@ -170,31 +170,31 @@ path_to_j2h_tmpl="${path_to_tmpl_root}/${name_of_j2h_tmpl}"
 echo
 echo 'process policies:'
 echo
-echo "  local policies root folder : ${path_to_sec_loc}/${policies_dir_path}"
-echo "  vault policies root url    : ${vault_host}/${policies_url_path}"
+echo "  local policies dir path : ${path_to_sec_loc}/${policies_dir_path}"
+echo "  vault policies url path : ${vault_host}/${policies_url_path}"
 
-for policies_path in "${policies_paths[@]}"
+for policy_path in "${policy_paths[@]}"
 do
     echo
 
-    jq_expr=".[] | select(.path == \"${policies_path}\")"
-    policies_conf="$(jq "${jq_expr}" <<< "${policies}")"
+    jq_expr=".[] | select(.path == \"${policy_path}\")"
+    policy_conf="$(jq "${jq_expr}" <<< "${policies}")"
 
-    file="$(jq -r '.file' <<< "${policies_conf}")"
-    path_to_policies_file="${path_to_sec_loc}/${policies_dir_path}/${file}"
+    policy_file="$(jq -r '.file' <<< "${policy_conf}")"
+    path_to_policy_file="${path_to_sec_loc}/${policies_dir_path}/${policy_file}"
 
-    if [ ! -e "${path_to_policies_file}" ]
+    if [ ! -e "${path_to_policy_file}" ]
     then
         echo '  ERROR: policy conf file does not exist:'
-        echo "    ${path_to_policies_file}"
+        echo "    ${path_to_policy_file}"
         exit 1
     fi
 
-    echo -n "  load policy conf from file at : ${file}: "
-    if output="$(yq read "${path_to_policies_file}" --tojson 2>&1)"
+    echo -n "  load policy conf from file at : ${policy_file}: "
+    if output="$(yq read "${path_to_policy_file}" --tojson 2>&1)"
     then
         echo 'OK'
-        policies_json="${output}"
+        policy_json="${output}"
     else
         echo 'ERROR'
         echo "    ${output}"
@@ -217,80 +217,80 @@ do
     # https://github.com/hashicorp/vault/issues/582#issue-104019680
 
     # echo
-    # echo 'policies_json:'
-    # jq '.' <<< "${policies_json}"
+    # echo 'policy_json:'
+    # jq '.' <<< "${policy_json}"
     # sample output:
-    # policies_json:
+    # policy_json:
     # [
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
+    #     "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-admin-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
+    #     "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-reader-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
+    #     "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-root-credentials"
     #   },
     #   {
     #     "capabilities": [
     #       "read"
     #     ],
-    #     "path": "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
+    #     "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-user-credentials"
     #   }
     # ]
 
     # if the yaml file doesn't conf any policies, json is empty;
     # ensure jinja works and a better error message is displayed in log
-    if [ -z "${policies_json}" ]
+    if [ -z "${policy_json}" ]
     then
-        policies_json='{ "policies": [] }'
+        policy_json='{ "policies": [] }'
     else
         # inject 'policies' root key to give
         # jinja a top level item to iterate over:
         # https://stackoverflow.com/q/54087843
-        policies_json="$(jq '{ policies: . }' <<< "${policies_json}")"
+        policy_json="$(jq '{ policies: . }' <<< "${policy_json}")"
     fi
 
     # echo
-    # echo 'policies_json:'
-    # jq '.' <<< "${policies_json}"
+    # echo 'policy_json:'
+    # jq '.' <<< "${policy_json}"
     # echo
     # sample output:
-    # policies_json:
+    # policy_json:
     # {
     #   "policies": [
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
+    #       "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-admin-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
+    #       "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-reader-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
+    #       "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-root-credentials"
     #     },
     #     {
     #       "capabilities": [
     #         "read"
     #       ],
-    #       "path": "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
+    #       "path": "kv-v2/data/Projects/MailFlow/Database/feature/database-user-credentials"
     #     }
     #   ]
     # }
@@ -298,10 +298,10 @@ do
     # turn json into jcl using jinja template
     # echo -n '    convert policies json into hcl: '
     if output="$(jinja2 --format=json --strict "${path_to_j2h_tmpl}" \
-                  <<< "${policies_json}" 2>&1)"
+                  <<< "${policy_json}" 2>&1)"
     then
         # echo 'OK'
-        policies_hcl="${output}"
+        policy_hcl="${output}"
     else
         echo 'ERROR'
         echo "      ${output}"
@@ -309,26 +309,26 @@ do
     fi
 
     # echo
-    # echo 'policies_hcl:'
-    # echo "${policies_hcl}"
+    # echo 'policy_hcl:'
+    # echo "${policy_hcl}"
     # sample output:
-    # policies_hcl:
-    # path "kv-v2/Projects/MailFlow/Database/feature/database-admin-credentials"
+    # policy_hcl:
+    # path "kv-v2/data/Projects/MailFlow/Database/feature/database-admin-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "kv-v2/Projects/MailFlow/Database/feature/database-reader-credentials"
+    # path "kv-v2/data/Projects/MailFlow/Database/feature/database-reader-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "kv-v2/Projects/MailFlow/Database/feature/database-root-credentials"
+    # path "kv-v2/data/Projects/MailFlow/Database/feature/database-root-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
     #
-    # path "kv-v2/Projects/MailFlow/Database/feature/database-user-credentials"
+    # path "kv-v2/data/Projects/MailFlow/Database/feature/database-user-credentials"
     # {
     #   capabilities = [ "read" ]
     # }
@@ -337,27 +337,27 @@ do
     # " replaced by \"; also inject 'policy' root key expected by vault;
     # NOTE: alternative approach:
     # replace new lines by \n: https://stackoverflow.com/a/43967678
-    # policies_hcl_json="$(sed -e 's|$|\\n|' -e 's|"|\\"|g' \
-    #                        <<< "${policies_hcl}"  | tr -d '\n')"
+    # policy_hcl_json="$(sed -e 's|$|\\n|' -e 's|"|\\"|g' \
+    #                     <<< "${policy_hcl}"  | tr -d '\n')"
     # jq arg from shell variable: https://stackoverflow.com/a/40027637
     jq_expr='{ policy: $policy_value }'
-    policies_json="$(jq -n --arg policy_value "${policies_hcl}" "${jq_expr}")"
+    policy_json="$(jq -n --arg policy_value "${policy_hcl}" "${jq_expr}")"
 
     # echo
-    # echo 'policies_json:'
-    # jq '.' <<< "${policies_json}"
+    # echo 'policy_json:'
+    # jq '.' <<< "${policy_json}"
     # sample output:
-    # policies_json:
+    # policy_json:
     # {
     #   "policy": "path \"kv-v2/ ... (some unreadable long line) ... ]\n}"
     # }
 
     # TODO: vault converts policies path into lower case
-    full_url="${vault_host}/${policies_url_path}/${policies_path}"
+    full_url="${vault_host}/${policies_url_path}/${policy_path}"
 
-    echo -n "  upload policy conf to path at : ${policies_path}: "
+    echo -n "  upload policy conf to path at : ${policy_path}: "
     if output="$(curl "${curl_args[@]}"                         \
-                      --data    "${policies_json}"              \
+                      --data    "${policy_json}"                \
                       --header  "X-Vault-Token: ${root_token}"  \
                       --request POST                            \
                       "${full_url}" 2>&1)"
