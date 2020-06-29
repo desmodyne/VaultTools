@@ -29,7 +29,7 @@ echo
 
 function enable_approle
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         # get function name: https://stackoverflow.com/a/1835958
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
@@ -114,7 +114,7 @@ function enable_approle
 
 function set_up_approle
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -145,8 +145,8 @@ function set_up_approle
 
     # TODO: path_to_sec_loc is a global variable - get as arg like vault_host ?
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method url path : ${vault_host}/${root_conf}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -166,17 +166,17 @@ function set_up_approle
         jq_expr=".[] | select(.path == \"${role_path}\")"
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
-        file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
+        role_file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
             echo '        ERROR: role conf file does not exist:'
-            echo "          ${file}"
+            echo "          ${role_file}"
             return 1
         fi
 
-        echo -n "        load role conf from file at : ${file}: "
+        echo -n "        load role conf from file at : ${role_file}: "
         if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
         then
             echo 'OK'
@@ -237,7 +237,7 @@ function set_up_approle
 
 function enable_jwt
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -293,7 +293,7 @@ function enable_jwt
 
 function set_up_jwt
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -318,8 +318,8 @@ function set_up_jwt
     roles="$(      jq -r '.roles'       <<< "${conf}")"
 
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method url path : ${vault_host}/${root_conf}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -339,17 +339,17 @@ function set_up_jwt
         jq_expr=".[] | select(.path == \"${role_path}\")"
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
-        file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
+        role_file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
             echo '        ERROR: role conf file does not exist:'
-            echo "          ${file}"
+            echo "          ${role_file}"
             return 1
         fi
 
-        echo -n "        load role conf from file at : ${file}: "
+        echo -n "        load role conf from file at : ${role_file}: "
         if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
         then
             echo 'OK'
@@ -402,7 +402,7 @@ function set_up_jwt
 
 function enable_token
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -458,7 +458,7 @@ function enable_token
 
 function set_up_token
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -483,8 +483,8 @@ function set_up_token
     roles="$(      jq -r '.roles'       <<< "${conf}")"
 
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method url path : ${vault_host}/${root_conf}"
     echo
 
     if [ -z "${roles}" ] || [ "${roles}" = 'null' ]
@@ -504,17 +504,17 @@ function set_up_token
         jq_expr=".[] | select(.path == \"${role_path}\")"
         role_conf="$(jq "${jq_expr}" <<< "${roles}")"
 
-        file="$(jq -r '.file' <<< "${role_conf}")"
-        path_to_role_file="${path_to_sec_loc}/${folder}/${file}"
+        role_file="$(jq -r '.file' <<< "${role_conf}")"
+        path_to_role_file="${path_to_sec_loc}/${folder}/${role_file}"
 
         if [ ! -e "${path_to_role_file}" ]
         then
             echo '        ERROR: role conf file does not exist:'
-            echo "          ${file}"
+            echo "          ${role_file}"
             return 1
         fi
 
-        echo -n "        load role conf from file at : ${file}: "
+        echo -n "        load role conf from file at : ${role_file}: "
         if output="$(yq read "${path_to_role_file}" --tojson 2>&1)"
         then
             echo 'OK'
@@ -565,7 +565,7 @@ function set_up_token
 
 function enable_userpass
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <conf>"
         return 1
@@ -621,7 +621,7 @@ function enable_userpass
 
 function set_up_userpass
 {
-    if [ $# -ne 3 ]
+    if [ ${#} -ne 3 ]
     then
         echo "Usage: ${FUNCNAME[0]} <vault host> <token> <method conf>"
         return 1
@@ -646,8 +646,8 @@ function set_up_userpass
     users="$(      jq -r '.users'       <<< "${conf}")"
 
     echo
-    echo "      local auth method root folder : ${path_to_sec_loc}/${folder}"
-    echo "      vault auth method root url    : ${vault_host}/${root_conf}"
+    echo "      local auth method dir path : ${path_to_sec_loc}/${folder}"
+    echo "      vault auth method url path : ${vault_host}/${root_conf}"
     echo
 
     if [ -z "${users}" ] || [ "${users}" = 'null' ]
@@ -667,17 +667,17 @@ function set_up_userpass
         jq_expr=".[] | select(.path == \"${user_path}\")"
         user_conf="$(jq "${jq_expr}" <<< "${users}")"
 
-        file="$(jq -r '.file' <<< "${user_conf}")"
-        path_to_user_file="${path_to_sec_loc}/${folder}/${file}"
+        role_file="$(jq -r '.file' <<< "${user_conf}")"
+        path_to_user_file="${path_to_sec_loc}/${folder}/${role_file}"
 
         if [ ! -e "${path_to_user_file}" ]
         then
-            echo '        ERROR: user file does not exist:'
-            echo "          ${file}"
+            echo '        ERROR: user conf file does not exist:'
+            echo "          ${role_file}"
             return 1
         fi
 
-        echo -n "        load user conf from file at : ${file}: "
+        echo -n "        load user conf from file at : ${role_file}: "
         if output="$(yq read "${path_to_user_file}" --tojson 2>&1)"
         then
             echo 'OK'
@@ -793,9 +793,11 @@ echo
 
 # NOTE: deviating from alphabetical order conv for consistency in
 # dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
+# NOTE: as opposed to the other dd-vt-upload- scripts, methods_dir_path
+# and methods_url_path are not used in here, but only in conf template:
+# .../code/tmpl/dd-vt-upload-methods.yaml.j2
 # shellcheck disable=SC2034
-attrs=(key_file_name path_to_sec_loc vault_host
-       methods methods_dir_path methods_url_path)
+attrs=(key_file_name path_to_sec_loc vault_host methods)
 # shellcheck disable=SC2034
 opt_attrs=()
 
