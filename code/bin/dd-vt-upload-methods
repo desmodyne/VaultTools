@@ -57,6 +57,7 @@ function enable_approle
     # auth method conf:
     # {
     #   "description": "AppRole auth method for machines to log in",
+    #   "enable_url_path": "v1/sys/auth/approle",
     #   "roles": [
     #     {
     #       "file": "Projects/MailFlow/Database/feature/builder.yaml",
@@ -65,7 +66,6 @@ function enable_approle
     #   ],
     #   "roles_dir_path": "v1/auth/approle/role",
     #   "roles_url_path": "v1/auth/approle/role",
-    #   "root_enable": "v1/sys/auth/approle",
     #   "type": "approle"
     # }
 
@@ -75,12 +75,12 @@ function enable_approle
     #   across all auth methods. This defaults to the "type" of the auth method.
     #   The auth method will be accessible at /auth/<path>.
 
-    description="$(jq -r '.description' <<< "${conf}")"
-    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
-    type="$(       jq -r '.type'        <<< "${conf}")"
+    description="$(    jq -r '.description'     <<< "${conf}")"
+    enable_url_path="$(jq -r '.enable_url_path' <<< "${conf}")"
+    type="$(           jq -r '.type'            <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/${root_enable}"
+    full_url="${vault_host}/${enable_url_path}"
 
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
@@ -255,12 +255,12 @@ function enable_jwt
     # auth method conf
     conf="${3}"
 
-    description="$(jq -r '.description' <<< "${conf}")"
-    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
-    type="$(       jq -r '.type'        <<< "${conf}")"
+    description="$(    jq -r '.description'     <<< "${conf}")"
+    enable_url_path="$(jq -r '.enable_url_path' <<< "${conf}")"
+    type="$(           jq -r '.type'            <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/${root_enable}"
+    full_url="${vault_host}/${enable_url_path}"
 
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
@@ -434,12 +434,12 @@ function enable_token
     # auth method conf
     conf="${3}"
 
-    description="$(jq -r '.description' <<< "${conf}")"
-    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
-    type="$(       jq -r '.type'        <<< "${conf}")"
+    description="$(    jq -r '.description'     <<< "${conf}")"
+    enable_url_path="$(jq -r '.enable_url_path' <<< "${conf}")"
+    type="$(           jq -r '.type'            <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/${root_enable}"
+    full_url="${vault_host}/${enable_url_path}"
 
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \
@@ -597,12 +597,12 @@ function enable_userpass
     # auth method conf
     conf="${3}"
 
-    description="$(jq -r '.description' <<< "${conf}")"
-    root_enable="$(jq -r '.root_enable' <<< "${conf}")"
-    type="$(       jq -r '.type'        <<< "${conf}")"
+    description="$(    jq -r '.description'     <<< "${conf}")"
+    enable_url_path="$(jq -r '.enable_url_path' <<< "${conf}")"
+    type="$(           jq -r '.type'            <<< "${conf}")"
 
     req_data="$(jo description="${description}" type="${type}")"
-    full_url="${vault_host}/${root_enable}"
+    full_url="${vault_host}/${enable_url_path}"
 
     echo -n '    enable auth method: '
     if output="$(curl "${curl_args[@]}"                     \

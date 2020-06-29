@@ -33,7 +33,7 @@ methods:           {% if methods is defined and methods %}
   {{ method.method_name }}:
     description:       {{ method.description }}
     type:              {{ method.type }}
-    root_enable:       {{ method.root_enable }}{% if method.roles_dir_path is defined and method.roles_dir_path %}
+    enable_url_path:   {{ method.enable_url_path }}{% if method.roles_dir_path is defined and method.roles_dir_path %}
     roles_dir_path:    {{ methods_dir_path }}/{{ method.roles_dir_path }}{% endif %}{% if method.roles_url_path is defined and method.roles_url_path %}
     roles_url_path:    {{ methods_url_path }}/{{ method.roles_url_path }}{% endif %}{% if method.users_dir_path is defined and method.users_dir_path %}
     users_dir_path:    {{ methods_dir_path }}/{{ method.users_dir_path }}{% endif %}{% if method.users_url_path is defined and method.users_url_path %}
