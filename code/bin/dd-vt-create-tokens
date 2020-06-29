@@ -146,7 +146,7 @@ then
     echo
     exit
 else
-    mapfile -t tokens_paths < <(jq -r '.[].path' <<< "${tokens}")
+    mapfile -t token_paths < <(jq -r '.[].path' <<< "${tokens}")
 fi
 
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
@@ -154,33 +154,32 @@ root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 echo
 echo 'process tokens:'
 echo
-echo "  local tokens root folder : ${path_to_sec_loc}/${tokens_dir_path}"
-echo "  vault tokens root url    : ${vault_host}/${tokens_url_path}"
+echo "  local tokens dir path : ${path_to_sec_loc}/${tokens_dir_path}"
+echo "  vault tokens url path : ${vault_host}/${tokens_url_path}"
 
-# TODO: clearly distinguish between singular and plural
 # TODO: handle case of no tokens paths
-for tokens_path in "${tokens_paths[@]}"
+for token_path in "${token_paths[@]}"
 do
     echo
 
-    jq_expr=".[] | select(.path == \"${tokens_path}\")"
-    tokens_conf="$(jq "${jq_expr}" <<< "${tokens}")"
+    jq_expr=".[] | select(.path == \"${token_path}\")"
+    token_conf="$(jq "${jq_expr}" <<< "${tokens}")"
 
-    file="$(jq -r '.file' <<< "${tokens_conf}")"
-    path_to_tokens_file="${path_to_sec_loc}/${tokens_dir_path}/${file}"
+    token_file="$(jq -r '.file' <<< "${token_conf}")"
+    path_to_token_file="${path_to_sec_loc}/${tokens_dir_path}/${token_file}"
 
-    if [ ! -e "${path_to_tokens_file}" ]
+    if [ ! -e "${path_to_token_file}" ]
     then
         echo '  ERROR: token conf file does not exist:'
-        echo "    ${path_to_tokens_file}"
+        echo "    ${path_to_token_file}"
         exit 1
     fi
 
-    echo -n "  load token conf from file at  : ${file}: "
-    if output="$(yq read "${path_to_tokens_file}" --tojson 2>&1)"
+    echo -n "  load token conf from file at  : ${token_file}: "
+    if output="$(yq read "${path_to_token_file}" --tojson 2>&1)"
     then
         echo 'OK'
-        tokens_json="${output}"
+        token_json="${output}"
     else
         echo 'ERROR'
         echo "    ${output}"
@@ -189,14 +188,14 @@ do
 
     # TODO: Vault does not support folder notation for tokens :-(
     # same problem as in several contexts in ./dd-vt-upload-methods
-    tokens_path="$(sed -e 's|/|_|g' <<< "${tokens_path}")"
-    tokens_path="${tokens_path,,}"
+    token_path="$(sed -e 's|/|_|g' <<< "${token_path}")"
+    token_path="${token_path,,}"
 
-    full_url="${vault_host}/${tokens_url_path}/${tokens_path}"
+    full_url="${vault_host}/${tokens_url_path}/${token_path}"
 
-    echo -n "  create token using path at    : ${tokens_path}: "
+    echo -n "  create token using path at    : ${token_path}: "
     if output="$(curl "${curl_args[@]}"                         \
-                      --data    "${tokens_json}"                \
+                      --data    "${token_json}"                \
                       --header  "X-Vault-Token: ${root_token}"  \
                       --request POST                            \
                       "${full_url}" 2>&1)"
@@ -221,11 +220,11 @@ do
     # (which in their current state are utterly unusable for that task...)
 
     # get relative folder to token file
-    token_folder="$(dirname "${file}")"
+    token_folder="$(dirname "${token_file}")"
     # replace .yaml suffix by .json
     # TODO: this assumes .yaml file suffix
     # TODO: get .token.json from conf ?
-    token_file="$(basename "${file%.yaml}").token.json"
+    token_file="$(basename "${token_file%.yaml}").token.json"
     # assemble full path to token output file
     local_file="${path_to_token_root}/${token_folder}/${token_file}"
 
