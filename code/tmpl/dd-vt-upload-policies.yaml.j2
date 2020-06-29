@@ -22,17 +22,17 @@ vault_host:        {{ vault_host }}
 
 
 # path to folder with policies config files, relative to path_to_sec_loc
-policies_folder:   {{ policies_folder }}
+policies_dir_path: {{ policies_dir_path }}
 
 # vault url path to policies, relative to vault_host
-policies_root:     {{ policies_root }}
+policies_url_path: {{ policies_url_path }}
 
 # policies to be uploaded to vault
 # properties:
 #   path: path into vault where the policy will be stored,
-#         relative to vault_host/policies_root
+#         relative to vault_host/policies_url_path
 #   file: path to and name of file with policy conf,
-#         relative to path_to_sec_loc/policies_folder
+#         relative to path_to_sec_loc/policies_dir_path
 policies:          {% if policies is defined and policies %}
 {%- for policy in policies %}
 - path: {{ policy.path }}

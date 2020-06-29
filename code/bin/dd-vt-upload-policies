@@ -91,7 +91,7 @@ echo
 # dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
-       policies policies_folder policies_root)
+       policies policies_dir_path policies_url_path)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -170,8 +170,8 @@ path_to_j2h_tmpl="${path_to_tmpl_root}/${name_of_j2h_tmpl}"
 echo
 echo 'process policies:'
 echo
-echo "  local policies root folder : ${path_to_sec_loc}/${policies_folder}"
-echo "  vault policies root url    : ${vault_host}/${policies_root}"
+echo "  local policies root folder : ${path_to_sec_loc}/${policies_dir_path}"
+echo "  vault policies root url    : ${vault_host}/${policies_url_path}"
 
 for policies_path in "${policies_paths[@]}"
 do
@@ -181,7 +181,7 @@ do
     policies_conf="$(jq "${jq_expr}" <<< "${policies}")"
 
     file="$(jq -r '.file' <<< "${policies_conf}")"
-    path_to_policies_file="${path_to_sec_loc}/${policies_folder}/${file}"
+    path_to_policies_file="${path_to_sec_loc}/${policies_dir_path}/${file}"
 
     if [ ! -e "${path_to_policies_file}" ]
     then
@@ -353,7 +353,7 @@ do
     # }
 
     # TODO: vault converts policies path into lower case
-    full_url="${vault_host}/${policies_root}/${policies_path}"
+    full_url="${vault_host}/${policies_url_path}/${policies_path}"
 
     echo -n "  upload policy conf to path at : ${policies_path}: "
     if output="$(curl "${curl_args[@]}"                         \
