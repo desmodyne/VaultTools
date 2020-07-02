@@ -42,8 +42,10 @@ methods:           {% if methods is defined and methods %}
     users_url_path:    {{ methods_url_path }}/{{ method.users_url_path }}{% endif %}{% if method.roles is defined %}
     roles:{% if method.roles %}
     {% for role in method.roles %}- path: {{ role.path }}
-      file: {{ role.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
+      file: {{ role.file }}{% if not loop.last %}
+    {% endif %}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
     users:{% if method.users %}
     {% for user in method.users %}- path: {{ user.path }}
-      file: {{ user.file }}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if not loop.last %}
+      file: {{ user.file }}{% if not loop.last %}
+    {% endif %}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if not loop.last %}
 {% endif %}{% endfor %}{% else %}null{% endif %}
