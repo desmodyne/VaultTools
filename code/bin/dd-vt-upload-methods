@@ -97,10 +97,10 @@ function enable_approle
             if [ "${err_resp}" = "path is already in use at approle/" ]
             then
                 echo 'IGNORE ERROR'
-                echo "      ${err_resp}"
+                echo "    ${err_resp}"
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "    ${err_resp}"
                 return 1
             fi
         fi
@@ -183,7 +183,7 @@ function set_up_approle
             role_json="${output}"
         else
             echo 'ERROR'
-            echo "    ${output}"
+            echo "        ${output}"
             return 1
         fi
 
@@ -223,12 +223,12 @@ function set_up_approle
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "        ${err_resp}"
                 return 1
             fi
         else
             echo 'ERROR'
-            echo "          ${output}"
+            echo "        ${output}"
             return 1
         fi
     done
@@ -276,10 +276,10 @@ function enable_jwt
             if [ "${err_resp}" = "path is already in use at jwt/" ]
             then
                 echo 'IGNORE ERROR'
-                echo "      ${err_resp}"
+                echo "    ${err_resp}"
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "    ${err_resp}"
                 return 1
             fi
         fi
@@ -424,7 +424,7 @@ function set_up_jwt
             role_json="${output}"
         else
             echo 'ERROR'
-            echo "    ${output}"
+            echo "        ${output}"
             return 1
         fi
 
@@ -468,12 +468,12 @@ function set_up_jwt
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "        ${err_resp}"
                 return 1
             fi
         else
             echo 'ERROR'
-            echo "          ${output}"
+            echo "        ${output}"
             return 1
         fi
     done
@@ -523,10 +523,10 @@ function enable_token
             if [ "${err_resp}" = "path is already in use at token/" ]
             then
                 echo 'IGNORE ERROR'
-                echo "      ${err_resp}"
+                echo "    ${err_resp}"
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "    ${err_resp}"
                 return 1
             fi
         fi
@@ -633,12 +633,12 @@ function set_up_token
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "        ${err_resp}"
                 return 1
             fi
         else
             echo 'ERROR'
-            echo "          ${output}"
+            echo "        ${output}"
             return 1
         fi
     done
@@ -686,10 +686,10 @@ function enable_userpass
             if [ "${err_resp}" = "path is already in use at userpass/" ]
             then
                 echo 'IGNORE ERROR'
-                echo "      ${err_resp}"
+                echo "    ${err_resp}"
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "    ${err_resp}"
                 return 1
             fi
         fi
@@ -766,7 +766,7 @@ function set_up_userpass
             user_json="${output}"
         else
             echo 'ERROR'
-            echo "    ${output}"
+            echo "        ${output}"
             return 1
         fi
 
@@ -799,12 +799,12 @@ function set_up_userpass
                 echo 'OK'
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "        ${err_resp}"
                 return 1
             fi
         else
             echo 'ERROR'
-            echo "          ${output}"
+            echo "        ${output}"
             return 1
         fi
     done

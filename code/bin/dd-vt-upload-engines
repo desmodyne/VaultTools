@@ -166,7 +166,7 @@ do
     if [ ! -e "${path_to_engine_file}" ]
     then
         echo '  ERROR: engine conf does not exist:'
-        echo "    ${path_to_engine_file}"
+        echo "  ${path_to_engine_file}"
         exit 1
     fi
 
@@ -177,7 +177,7 @@ do
         engine_json="${output}"
     else
         echo 'ERROR'
-        echo "    ${output}"
+        echo "  ${output}"
         exit 1
     fi
 
@@ -204,16 +204,16 @@ do
             if [ "${err_resp}" = "path is already in use at kv-v2/" ]
             then
                 echo 'IGNORE ERROR'
-                echo "      ${err_resp}"
+                echo "  ${err_resp}"
             else
                 echo 'ERROR'
-                echo "          ${err_resp}"
+                echo "  ${err_resp}"
                 exit 1
             fi
         fi
     else
         echo 'ERROR'
-        echo "        ${output}"
+        echo "  ${output}"
         exit 1
     fi
 done

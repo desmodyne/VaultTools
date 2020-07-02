@@ -182,7 +182,7 @@ do
         token_json="${output}"
     else
         echo 'ERROR'
-        echo "    ${output}"
+        echo "  ${output}"
         exit 1
     fi
 
@@ -211,7 +211,7 @@ do
         fi
     else
         echo 'ERROR'
-        echo "        ${output}"
+        echo "  ${output}"
         exit 1
     fi
 

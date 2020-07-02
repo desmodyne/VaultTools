@@ -177,20 +177,21 @@ do
 
         # sample error response:
         # { "errors" : [ "1 error occurred:\n\n* permission denied" ] }
+        # TODO: use check_response for this
         else
             if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
             then
                 echo 'ERROR'
-                echo "${errors}"
+                echo "  ${errors}"
             else
                 echo 'ERROR'
-                echo "${output}"
+                echo "  ${output}"
             fi
             exit 1
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 
