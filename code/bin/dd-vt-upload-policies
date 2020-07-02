@@ -296,14 +296,13 @@ do
     # }
 
     # turn json into jcl using jinja template
-    echo -n '  convert policies json into hcl: '
     if output="$(jinja2 --format=json --strict "${path_to_j2h_tmpl}" \
                   <<< "${policy_json}" 2>&1)"
     then
         # echo 'OK'
         policy_hcl="${output}"
     else
-        echo 'ERROR'
+        echo 'ERROR: failed to convert policies json into hcl:'
         echo "  ${output}"
         exit 1
     fi
