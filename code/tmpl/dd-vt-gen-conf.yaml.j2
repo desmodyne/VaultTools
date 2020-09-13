@@ -1,0 +1,23 @@
+---
+# dd-vt-gen-conf.yaml, rendered from dd-vt-gen-conf.yaml.j2
+#
+# dd-vt-gen-conf script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-17
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# path to folder with secrets config files, relative to path_to_sec_loc
+secrets_dir_path:  {{ secrets_dir_path }}
+
+# file pattern (glob) to match secrets files
+# NOTE: add quotes to ensure valid yaml for e.g. *.yaml
+# TODO: review yaml tmpls globally, add quotes as needed
+file_pattern:      "{{ file_pattern }}"

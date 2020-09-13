@@ -1,0 +1,34 @@
+---
+# dd-vt-unseal-vault.yaml, rendered from dd-vt-unseal-vault.yaml.j2
+#
+# dd-vt-unseal-vault script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-15
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# name of file with vault UUID and status info, relative to path_to_sec_loc
+info_file_name:    {{ info_file_name }}
+
+# message for committing new init file to git;
+# NOTE: defined as list of lines to preserve a little sanity:
+# in the yaml spec (of _some_ version, implmented so _some_ degree),
+# multi-line values are somewhat esoteric: https://stackoverflow.com/a/21699210
+# multi-line values with empty lines seem outright impossible...
+git_msg_lines:
+  {%- for git_msg_line in git_msg_lines %}
+  - "{{ git_msg_line }}"
+  {%- endfor %}
+
+# vault server protocol, host and port
+vault_host:        {{ vault_host }}

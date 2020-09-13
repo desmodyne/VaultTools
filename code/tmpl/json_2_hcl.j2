@@ -1,0 +1,6 @@
+{% for policy in policies %}path "{{ policy.path }}"
+{
+  capabilities = [ {% for cap in policy.capabilities %}"{{ cap }}"{% if not loop.last %},{% endif %} {% endfor %}]
+}{% if not loop.last %}
+
+{% endif %}{% endfor %}

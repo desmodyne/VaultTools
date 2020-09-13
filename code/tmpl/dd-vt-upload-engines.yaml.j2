@@ -1,0 +1,40 @@
+---
+# dd-vt-upload-engines.yaml, rendered from dd-vt-upload-engines.yaml.j2
+#
+# dd-vt-upload-engines script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-23
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# vault server protocol, host and port
+vault_host:        {{ vault_host }}
+
+
+# path to folder with engines config files, relative to path_to_sec_loc
+engines_dir_path:  {{ engines_dir_path }}
+
+# path to vault url with engines REST endpoints, relative to vault_host
+engines_url_path:  {{ engines_url_path }}
+
+# engines to be uploaded to vault
+# properties:
+#   path: path into vault where the engine will be stored,
+#         relative to vault_host/engines_url_path
+#   file: path to and name of file with engine conf,
+#         relative to path_to_sec_loc/engines_dir_path
+engines:           {% if engines is defined and engines %}
+{%- for engine in engines %}
+- path: {{ engine.path }}
+  file: {{ engine.file }}
+{%- endfor %}{% else %}null{% endif %}

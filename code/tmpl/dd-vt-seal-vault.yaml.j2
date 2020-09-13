@@ -1,0 +1,21 @@
+---
+# dd-vt-seal-vault.yaml, rendered from dd-vt-seal-vault.yaml.j2
+#
+# dd-vt-seal-vault script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-15
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# vault server protocol, host and port
+vault_host:        {{ vault_host }}

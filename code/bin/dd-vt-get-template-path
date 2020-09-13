@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+
+# dd-vt-get-template-path
+#
+# print the absolute, canonical script configuration template root path
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-02-16
+
+
+# TODO: think about using VaultTools as installed by package for production
+
+
+# -----------------------------------------------------------------------------
+# configure script parameters
+
+# absolute path to this script: http://stackoverflow.com/a/9107028
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# NOTE: sample output when currently run in different contexts:
+# run on develpment host alexa:
+#   here: /Users/ssc/DevBase/DesmoDyne/Tools/VaultTools/code/bin
+# run on alexa, VaultTools installed using brew package:
+#   here: /usr/local/bin
+# run on CI/CD host contabo, VaultTools installed using (linux-) brew package:
+#   here: /home/linuxbrew/.linuxbrew/bin
+# echo "here: ${here}"
+
+# NOTE: ${here} is used to determine if VaultTools are run in a development
+# or production context, i.e. if the scripts are located in a project space
+# or were installed by a brew package; the template location is then derived
+# TODO: is there a better way to determine dev / prod / other context ?
+
+# TODO: get these from conf - but then, loading conf requires conf location...
+
+# glob pattern for path that indicates a project space / development context
+path_to_dev='*DevBase/DesmoDyne/Tools/VaultTools/code/bin'
+
+# paths that indicate a production context
+paths_to_prod=('/home/linuxbrew/.linuxbrew/bin' '/usr/local/bin')
+
+# TODO: verify if there actually are conf templates at "${path_to_tmpl_root}" ?
+
+# https://stackoverflow.com/a/2172367
+# NOTE: no quoting required; from http://mywiki.wooledge.org/BashFAQ/031:
+# "No WordSplitting or glob expansion will be done for [["
+if [[ ${here} == ${path_to_dev} ]]
+then
+
+    # development context
+
+    # path from this script to project root
+    path_to_proj_root='../..'
+
+    # path to configuration template root folder, relative to project root
+    path_to_tmpl_root='code/tmpl'
+
+    # absolute, canonical path to project root
+    path_to_proj_root="$(realpath "${here}/${path_to_proj_root}")"
+
+    # absolute, canonical path to configuration template root folder
+    path_to_tmpl_root="${path_to_proj_root}/${path_to_tmpl_root}"
+
+else
+
+    # production context
+
+    # TODO: use HOMEBREW_PREFIX=/home/linuxbrew/.linuxbrew ?
+
+    # path from this script to installation root folder
+    path_to_inst_root='..'
+
+    # path to configuration template root folder, relative to installation root
+    path_to_tmpl_root='share/dd-vault-tools'
+
+    # absolute, canonical path to installation root
+    path_to_inst_root="$(realpath "${here}/${path_to_inst_root}")"
+
+    # absolute, canonical path to configuration template root folder
+    path_to_tmpl_root="${path_to_inst_root}/${path_to_tmpl_root}"
+
+    found=false
+
+    for path_to_prod in "${paths_to_prod[@]}"
+    do
+        # NOTE: [[ ]] used for consistency with above
+        if [[ ${here} == ${path_to_prod} ]]
+        then
+            found=true
+            break
+        fi
+    done
+
+    # neither development nor production context
+
+    if [ "${found}" = false ]
+    then
+        # TODO: print to stderr, not stdout
+        echo "ERROR: unexpected script location:\n  ${here}"
+        exit 1
+    fi
+fi
+
+# TODO: commented out as BashLib funcs can't be used unless muted, see below
+
+# absolute path to BashLib library file
+# path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
+
+# array with alphabetical list of tools called by this script
+# shellcheck disable=SC2034
+# req_tools=('realpath')
+
+# array with paths to append to PATH
+# shellcheck disable=SC2034
+# ext_paths=()
+
+
+# -----------------------------------------------------------------------------
+# load BashLib
+
+# # shellcheck disable=SC1090
+# if output="$(source "${path_to_bashlib}" 2>&1)"
+# then
+#     source "${path_to_bashlib}"
+# else
+#     echo "${output}"
+#     exit 1
+# fi
+
+
+# -----------------------------------------------------------------------------
+# run BashLib boilerplate functions
+
+# TODO: the final output on stdout below is the result of this script
+# and is evaluated by client scripts, so there can be no other output
+
+# TODO: add switch to prevent any output on stdout
+# if ! configure_platform              ; then exit 1; fi
+# if ! extend_path req_tools ext_paths ; then exit 1; fi
+
+
+# -----------------------------------------------------------------------------
+# print script configuration template root path
+
+# TODO: review error handling / stdout/stderr handling
+echo "${path_to_tmpl_root}"

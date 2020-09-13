@@ -37,7 +37,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'git' 'jq' 'yq')
+req_tools=('curl' 'git' 'jq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -82,7 +82,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(info_file_name key_file_name path_to_sec_loc vault_address)
+attrs=(git_msg_lines info_file_name key_file_name path_to_sec_loc vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -116,13 +116,13 @@ get_vault_status
 res=$?
 case "${res}" in
     0)  # shellcheck disable=SC2154
-        echo "vault at ${vault_address} is already unsealed"
+        echo "vault at ${vault_host} is already unsealed"
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
     2)  #
         ;;
-    3)  echo "vault at ${vault_address} is not yet initialized"
+    3)  echo "vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -151,8 +151,9 @@ do
                       --request PUT                     \
                       --show-error                      \
                       --silent                          \
-                      "${vault_address}/v1/sys/unseal" 2>&1)"
+                      "${vault_host}/v1/sys/unseal" 2>&1)"
     then
+        # TODO: review error handling
         # if successful, curl returns 0 and
         # output is json with unseal status;
         # otherwise, curl also returns 0 and
@@ -176,20 +177,21 @@ do
 
         # sample error response:
         # { "errors" : [ "1 error occurred:\n\n* permission denied" ] }
+        # TODO: use check_response for this
         else
             if errors="$(jq -r '.errors[]' <<< "${output}" 2>&1)"
             then
                 echo 'ERROR'
-                echo "${errors}"
+                echo "  ${errors}"
             else
                 echo 'ERROR'
-                echo "${output}"
+                echo "  ${output}"
             fi
             exit 1
         fi
     else
         echo 'ERROR'
-        echo "${output}"
+        echo "  ${output}"
         exit 1
     fi
 
@@ -210,7 +212,7 @@ fi
 # NOTE: this somewhat duplicates dd-vt-vault.lib > get_vault_status,
 # but here, the actual output is needed and not only the status code
 echo -n 'get vault status: '
-if output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+if output="$(vault status -address="${vault_host}" -format=json 2>&1)"
 then
     echo 'OK'
     vault_status="${output}"
@@ -243,19 +245,29 @@ else
     exit 1
 fi
 
-# TODO: add vault UUID and public / private info
-git_msg='add vault status file'
-
-echo -n 'commit vault info file: '
-# shellcheck disable=SC2154
-if output="$(git -C "${path_to_sec_loc}" \
-                 commit -m "${git_msg}" "${path_to_info_file}" 2>&1)"
+# stage and commit only if anything changed
+# https://stackoverflow.com/a/8123841
+# https://stackoverflow.com/a/2659808
+# TODO: there are multiple ways to do this being used; align
+if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
-    echo 'OK'
+    echo 'no change to vault status file'
 else
-    echo 'ERROR:'
-    echo "${output}"
-    exit 1
+    # convert message lines json array into single multi-line string
+    mapfile -t git_msg_lines < <(jq -r '.[]' <<< "${git_msg_lines}")
+    git_msg="$(printf '%s\n' "${git_msg_lines[@]}")"
+
+    echo -n 'commit vault info file: '
+    # shellcheck disable=SC2154
+    if output="$(git -C "${path_to_sec_loc}" \
+                     commit -m "${git_msg}" "${path_to_info_file}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR:'
+        echo "${output}"
+        exit 1
+    fi
 fi
 
 

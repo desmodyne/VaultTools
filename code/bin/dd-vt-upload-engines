@@ -1,22 +1,21 @@
 #!/usr/bin/env bash
 
-# dd-vt-upload-secrets
+# dd-vt-upload-engines
 #
-# upload secrets to a vault server
+# upload (i.e. set up) engines to (on) a vault server
 #
 # author  : stefan schablowski
 # contact : stefan.schablowski@desmodyne.com
-# created : 2018-02-22
+# created : 2020-06-25
 
 
-# https://www.vaultproject.io/docs/commands/write.html
-# https://www.vaultproject.io/intro/getting-started/first-secret.html
+# https://learn.hashicorp.com/vault/getting-started/secrets-engines
 
-# NOTE: see also dd-vt-init-vault and dd-vt-upload-policies
+# NOTE: see also dd-vt-init-vault
 
 
 echo
-echo 'Upload HashiCorp Vault secrets'
+echo 'Upload HashiCorp Vault engines'
 echo
 
 
@@ -34,7 +33,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'jq' 'yq')
+req_tools=('curl' 'dd-vt-get-template-path' 'jq' 'yq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -83,10 +82,10 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # NOTE: deviating from alphabetical order conv for consistency in
-# dd-vt-upload-methods, dd-vt-upload-policies and dd-vt-upload-secrets
+# dd-vt-upload-methods, dd-vt-upload-engines and dd-vt-upload-secrets
 # shellcheck disable=SC2034
 attrs=(key_file_name path_to_sec_loc vault_host
-       secrets secrets_dir_path secrets_url_path)
+       engines engines_dir_path engines_url_path)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -98,7 +97,6 @@ if ! get_attrs_from_yaml_file "${conf_file}" attrs opt_attrs; then exit 1; fi
 
 # -----------------------------------------------------------------------------
 # validate configuration and folder at secure location
-# TODO: really do these both in every sub script ?
 if ! validate_config_settings;      then exit 1; fi
 if ! validate_secure_location;      then exit 1; fi
 
@@ -133,71 +131,68 @@ fi
 
 
 # -----------------------------------------------------------------------------
-# upload secrets
+# upload engines
 
 # shellcheck disable=SC2154
-if [ -z "${secrets}" ] || [ "${secrets}" = 'null' ]
+if [ -z "${engines}" ] || [ "${engines}" = 'null' ]
 then
-    echo 'no secrets configured'
+    echo 'no engines configured'
     echo
-    echo 'HashiCorp Vault secrets upload complete'
+    echo 'HashiCorp Vault engines upload complete'
     echo
     exit
 else
-    mapfile -t secrets_paths < <(jq -r '.[].path' <<< "${secrets}")
+    mapfile -t engine_paths < <(jq -r '.[].path' <<< "${engines}")
 fi
 
-# TODO: refactor this out to remove code duplication
 root_token="$(jq -r '.root_token' "${path_to_key_file}")"
 
 echo
-echo 'process secrets:'
+echo 'process engines:'
 echo
-echo "  local secrets dir path : ${path_to_sec_loc}/${secrets_dir_path}"
-echo "  vault secrets url path : ${vault_host}/${secrets_url_path}"
+echo "  local engines dir path : ${path_to_sec_loc}/${engines_dir_path}"
+echo "  vault engines url path : ${vault_host}/${engines_url_path}"
 
-# NOTE: there are multiple secrets in one file, so secrets_path, not secret_path
-# and, in order to match conv in all dd-vt-upload_* files, also secrets_file
-# TODO: handle case of no secrets paths
-for secrets_path in "${secrets_paths[@]}"
+for engine_path in "${engine_paths[@]}"
 do
     echo
 
-    jq_expr=".[] | select(.path == \"${secrets_path}\")"
-    secrets_conf="$(jq "${jq_expr}" <<< "${secrets}")"
+    jq_expr=".[] | select(.path == \"${engine_path}\")"
+    engine_conf="$(jq "${jq_expr}" <<< "${engines}")"
 
-    secrets_file="$(jq -r '.file' <<< "${secrets_conf}")"
-    path_to_secrets_file="${path_to_sec_loc}/${secrets_dir_path}/${secrets_file}"
+    engine_file="$(jq -r '.file' <<< "${engine_conf}")"
+    path_to_engine_file="${path_to_sec_loc}/${engines_dir_path}/${engine_file}"
 
-    if [ ! -e "${path_to_secrets_file}" ]
+    if [ ! -e "${path_to_engine_file}" ]
     then
-        echo '  ERROR: secrets conf file does not exist:'
-        echo "    ${path_to_secrets_file}"
+        echo '  ERROR: engine conf does not exist:'
+        echo "  ${path_to_engine_file}"
         exit 1
     fi
 
-    echo -n "  load secrets conf from file at : ${secrets_file}: "
-    if output="$(yq read "${path_to_secrets_file}" --tojson 2>&1)"
+    echo -n "  load engine conf from file at : ${engine_file}: "
+    if output="$(yq read "${path_to_engine_file}" --tojson 2>&1)"
     then
         echo 'OK'
-        secrets_json="${output}"
+        engine_json="${output}"
     else
         echo 'ERROR'
         echo "  ${output}"
         exit 1
     fi
 
-    # TODO: for some reason, Vault expects KV2 secrets to be underneath data;
-    # this was not the case for cubbyhole, not sure about other engines;
-    # jq inputs:   https://stedolan.github.io/jq/manual/#IO
-    # example use: https://stackoverflow.com/a/29404613
-    secrets_json="$(jq -n '.data = inputs' <<< "${secrets_json}")"
+    full_url="${vault_host}/${engines_url_path}/${engine_path}"
 
-    full_url="${vault_host}/${secrets_url_path}/${secrets_path}"
-
-    echo -n "  upload secrets conf to path at : ${secrets_path}: "
+    # NOTE: once again, official HashiCorp Vault docs fails to doc how to
+    # enable a KV2 engine using curl; putting info together from many places:
+    # https://learn.hashicorp.com/vault/developer/ ...
+    #  ... sm-static-secrets#step-1-enable-kv-secrets-engine
+    # https://learn.hashicorp.com/vault/secrets-management/sm-versioned-kv
+    # https://www.vaultproject.io/docs/secrets/kv/kv-v2.html
+    # https://www.vaultproject.io/api/secret/kv/kv-v2.html
+    echo -n "  upload engine conf to path at : ${engine_path}: "
     if output="$(curl "${curl_args[@]}"                         \
-                      --data    "${secrets_json}"               \
+                      --data    "${engine_json}"                \
                       --header  "X-Vault-Token: ${root_token}"  \
                       --request POST                            \
                       "${full_url}" 2>&1)"
@@ -206,7 +201,7 @@ do
         then
             echo 'OK'
         else
-            if [ "${err_resp}" = "path is already in use at userpass/" ]
+            if [ "${err_resp}" = "path is already in use at kv-v2/" ]
             then
                 echo 'IGNORE ERROR'
                 echo "  ${err_resp}"
@@ -225,5 +220,5 @@ done
 
 
 echo
-echo 'HashiCorp Vault secrets upload complete'
+echo 'HashiCorp Vault engines upload complete'
 echo
