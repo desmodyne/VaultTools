@@ -25,7 +25,7 @@ path_to_bashlib='/usr/local/lib/dd-bash-lib.sh'
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('dd-vt-configure-vault'     'dd-vt-init-vault' 'dd-vt-seal-vault'
+req_tools=('dd-vt-conf-vault'          'dd-vt-init-vault' 'dd-vt-seal-vault'
            'dd-vt-set-up-auth-methods' 'dd-vt-unseal-vault'
            'dd-vt-upload-policies'     'dd-vt-upload-secrets')
 
@@ -52,8 +52,8 @@ fi
 # run BashLib boilerplate functions
 
 if ! configure_platform              ; then exit 1; fi
-if ! get_conf_file_arg "${@}"        ; then exit 1; fi
 if ! extend_path req_tools ext_paths ; then exit 1; fi
+if ! get_conf_file_arg "${@}"        ; then exit 1; fi
 
 
 # -----------------------------------------------------------------------------
@@ -85,7 +85,7 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 # shellcheck disable=SC2154
 if ! dd-vt-init-vault            "${conf_file}"; then exit 1; fi
 if ! dd-vt-unseal-vault          "${conf_file}"; then exit 1; fi
-if ! dd-vt-configure-vault       "${conf_file}"; then exit 1; fi
+if ! dd-vt-conf-vault            "${conf_file}"; then exit 1; fi
 if ! dd-vt-set-up-auth-methods   "${conf_file}"; then exit 1; fi
 
 # if ! dd-vt-upload-policies       "${conf_file}"; then exit 1; fi

@@ -1,0 +1,51 @@
+---
+# dd-vt-upload-methods.yaml, rendered from dd-vt-upload-methods.yaml.j2
+#
+# dd-vt-upload-methods script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-23
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# vault server protocol, host and port
+vault_host:        {{ vault_host }}
+
+
+# path to folder with per-auth methods folders, rel to path_to_sec_loc
+methods_dir_path:  {{ methods_dir_path }}
+
+# vault url path to per-auth methods paths, relative to vault_host
+methods_url_path:  {{ methods_url_path }}
+
+# auth methods to be uploaded to / set up in vault
+methods:           {% if methods is defined and methods %}
+{% for method in methods %}
+  {{ method.method_name }}:
+    description:       {{ method.description }}
+    type:              {{ method.type }}
+    enable_url_path:   {{ method.enable_url_path }}{% if method.conf_url_path is defined and method.conf_url_path %}
+    conf_url_path:     {{ method.conf_url_path }}{% endif %}{% if method.conf_dir_file is defined and method.conf_dir_file %}
+    conf_dir_file:     {{ method.conf_dir_file }}{% endif %}{% if method.roles_dir_path is defined and method.roles_dir_path %}
+    roles_dir_path:    {{ methods_dir_path }}/{{ method.roles_dir_path }}{% endif %}{% if method.roles_url_path is defined and method.roles_url_path %}
+    roles_url_path:    {{ methods_url_path }}/{{ method.roles_url_path }}{% endif %}{% if method.users_dir_path is defined and method.users_dir_path %}
+    users_dir_path:    {{ methods_dir_path }}/{{ method.users_dir_path }}{% endif %}{% if method.users_url_path is defined and method.users_url_path %}
+    users_url_path:    {{ methods_url_path }}/{{ method.users_url_path }}{% endif %}{% if method.roles is defined %}
+    roles:{% if method.roles %}
+    {% for role in method.roles %}- path: {{ role.path }}
+      file: {{ role.file }}{% if not loop.last %}
+    {% endif %}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if method.users is defined %}
+    users:{% if method.users %}
+    {% for user in method.users %}- path: {{ user.path }}
+      file: {{ user.file }}{% if not loop.last %}
+    {% endif %}{% endfor %}{% else %}         null{% endif %}{% endif %}{% if not loop.last %}
+{% endif %}{% endfor %}{% else %}null{% endif %}

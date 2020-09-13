@@ -23,6 +23,70 @@
 
 
 # -----------------------------------------------------------------------------
+function check_response
+{
+    if [ $# -ne 1 ]
+    then
+        # get function name: https://stackoverflow.com/a/1835958
+        echo "Usage: ${FUNCNAME[0]} <vault response>" 2>&1
+        return 1
+    fi
+
+    # TODO: validate arguments
+
+    # response from vault instance
+    response="${1}"
+
+    if [ -z "${response}" ]
+    then
+        return 0
+    fi
+
+    # jq expression to test vault REST API response for errors;
+    # returns the (multi-line) error string or empty if no error
+    # TODO: does Vault ever return errors AND warnings ?
+    # TODO: print errors properly; sample values:
+    #   {"errors":["1 error occurred:\n\t* unsupported path\n\n"]}
+    #   {
+    #     "errors": [
+    #       "no data provided"
+    #     ]
+    #   }
+    #   {
+    #     "request_id": "58da4235-5968-d05f-48b1-02de85b0c4b2",
+    #     "lease_id": "",
+    #     "renewable": false,
+    #     "lease_duration": 0,
+    #     "data": null,
+    #     "wrap_info": null,
+    #     "warnings": [
+    #       "Invalid path for a versioned K/V secrets engine. See ... "
+    #     ],
+    #     "auth": null
+    #   }
+    #
+    # https://stackoverflow.com/a/33059058
+    # https://stackoverflow.com/a/36330650
+    # https://stackoverflow.com/a/38337572
+    # https://github.com/stedolan/jq/issues/354#issuecomment-43102213
+
+    jq_err='if   .errors   and (.errors   | length) > 0 then .errors[] '`
+          `'elif .warnings and (.warnings | length) > 0 then .warnings[] '`
+          `'else empty end'
+
+    err_resp="$(jq -r "${jq_err}" <<< "${response}")"
+
+    if [ -z "${err_resp}" ]
+    then
+        return 0
+    else
+        echo "${err_resp}" 2>&1
+        return 1
+    fi
+}
+
+
+# -----------------------------------------------------------------------------
 function get_vault_status
 {
     echo -n 'get vault status: '
@@ -55,7 +119,7 @@ function get_vault_status
     #   }
 
     # shellcheck disable=SC2154
-    output="$(vault status -address="${vault_address}" -format=json 2>&1)"
+    output="$(vault status -address="${vault_host}" -format=json 2>&1)"
     res=$?
 
     case "${res}" in

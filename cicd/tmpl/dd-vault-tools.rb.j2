@@ -16,19 +16,17 @@ class DdVaultTools < Formula
   url      "{{ archive_url }}"
   sha256   "{{ sha256_sum }}"
 
-  # NOTE: only req'd for CI/CD
-  # req'd for realpath, sha256sum
-  # depends_on "coreutils"
-  # depends_on "jinja2-cli"
-
-  # required to update default bash 3 to version 4 (or 5)
-  depends_on "bash"
+  # req'd for realpath and others
+  depends_on "coreutils"
   depends_on "desmodyne/tools/dd-bash-lib"
+  depends_on "git"
+  depends_on "jinja2-cli"
   depends_on "jq"
   depends_on "vault"
   depends_on "yq"
 
   def install
-    bin.install Dir["code/bin/*"]
+    bin.install      Dir["code/bin/*"]
+    pkgshare.install Dir["code/tmpl/*"]
   end
 end

@@ -12,6 +12,10 @@
 # https://www.vaultproject.io/api/system/init.html
 
 
+# TODO: revoke root token after vault has been fully set up:
+# https://www.vaultproject.io/docs/concepts/tokens#root-tokens
+
+
 echo
 echo 'Initialize HashiCorp Vault instance'
 echo
@@ -31,7 +35,7 @@ path_to_vaultlib="${here}/dd-vt-vault.lib"
 
 # array with alphabetical list of tools called by this script
 # shellcheck disable=SC2034
-req_tools=('curl' 'git' 'jq' 'yq')
+req_tools=('curl' 'git' 'jq')
 
 # array with paths to append to PATH
 # shellcheck disable=SC2034
@@ -76,8 +80,8 @@ if ! extend_path req_tools ext_paths ; then exit 1; fi
 echo
 
 # shellcheck disable=SC2034
-attrs=(key_file_name path_to_sec_loc
-       secret_shares secret_threshold vault_address)
+attrs=(git_msg_lines key_file_name path_to_sec_loc
+       secret_shares secret_threshold vault_host)
 # shellcheck disable=SC2034
 opt_attrs=()
 
@@ -115,13 +119,13 @@ get_vault_status
 res=$?
 case "${res}" in
     0)  # shellcheck disable=SC2154
-        echo "  vault at ${vault_address} is already initialized - and unsealed"
+        echo "  vault at ${vault_host} is already initialized - and unsealed"
         ;;
     1)  # error message is displayed by get_vault_status
         ;;
-    2)  echo "  vault at ${vault_address} is already initialized - and sealed"
+    2)  echo "  vault at ${vault_host} is already initialized - and sealed"
         ;;
-    3)  echo "  vault at ${vault_address} is not yet initialized"
+    3)  echo "  vault at ${vault_host} is not yet initialized"
         ;;
 esac
 
@@ -165,8 +169,9 @@ if output="$(curl --data "${json_data}" \
                   --request PUT         \
                   --show-error          \
                   --silent              \
-                  "${vault_address}/v1/sys/init" 2>&1)"
+                  "${vault_host}/v1/sys/init" 2>&1)"
 then
+    # TODO: review error handling
     # if successful, curl returns 0 and
     # output is json with keys and token
     echo 'OK'
@@ -213,19 +218,28 @@ else
     exit 1
 fi
 
-# TODO: add vault UUID and public / private info
-git_msg='initialize vault'
-
-echo -n 'commit init response file: '
-# shellcheck disable=SC2154
-if output="$(git -C "${path_to_sec_loc}" \
-                 commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+# stage and commit only if anything changed
+# https://stackoverflow.com/a/8123841
+# https://stackoverflow.com/a/2659808
+if git -C "${path_to_sec_loc}" diff-index --quiet HEAD --
 then
-    echo 'OK'
+    echo 'no change to vault init response file'
 else
-    echo 'ERROR:'
-    echo "${output}"
-    exit 1
+    # convert message lines json array into single multi-line string
+    mapfile -t git_msg_lines < <(jq -r '.[]' <<< "${git_msg_lines}")
+    git_msg="$(printf '%s\n' "${git_msg_lines[@]}")"
+
+    echo -n 'commit init response file: '
+    # shellcheck disable=SC2154
+    if output="$(git -C "${path_to_sec_loc}" \
+                     commit -m "${git_msg}" "${path_to_key_file}" 2>&1)"
+    then
+        echo 'OK'
+    else
+        echo 'ERROR:'
+        echo "${output}"
+        exit 1
+    fi
 fi
 
 

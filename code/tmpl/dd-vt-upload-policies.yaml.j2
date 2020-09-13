@@ -1,0 +1,40 @@
+---
+# dd-vt-upload-policies.yaml, rendered from dd-vt-upload-policies.yaml.j2
+#
+# dd-vt-upload-policies script configuration file
+#
+# author  : stefan schablowski
+# contact : stefan.schablowski@desmodyne.com
+# created : 2020-06-23
+
+
+# TODO: see ./dd-vt-init-vault.yaml.j2
+
+
+# absolute path to secure location with sensitive data for this vault
+path_to_sec_loc:   {{ path_to_sec_loc }}
+
+# name of file with keys to unseal vault, relative to path_to_sec_loc
+key_file_name:     {{ key_file_name }}
+
+# vault server protocol, host and port
+vault_host:        {{ vault_host }}
+
+
+# path to folder with policies config files, relative to path_to_sec_loc
+policies_dir_path: {{ policies_dir_path }}
+
+# vault url path to policies, relative to vault_host
+policies_url_path: {{ policies_url_path }}
+
+# policies to be uploaded to vault
+# properties:
+#   path: path into vault where the policy will be stored,
+#         relative to vault_host/policies_url_path
+#   file: path to and name of file with policy conf,
+#         relative to path_to_sec_loc/policies_dir_path
+policies:          {% if policies is defined and policies %}
+{%- for policy in policies %}
+- path: {{ policy.path }}
+  file: {{ policy.file }}
+{%- endfor %}{% else %}null{% endif %}
